@@ -44,7 +44,7 @@ The Epic Games Launcher remembers who is signed in using:
 1. a credential stored in **Windows Credential Manager** (`com.epicgames.eglv2.prod`), and
 2. session files in `%LOCALAPPDATA%\com.epicgames.eglv2\auth`.
 
-When you click **Save current account**, the app closes the Launcher, takes a snapshot of both, encrypts it and stores it as a profile. When you click **Switch**, it closes the Launcher, moves the current `auth` and `EBWebView` folders to a backup, restores the selected profile's snapshot, and (optionally) starts the Launcher again — now signed in to that account.
+When you click **Save current account**, the app closes the Launcher, takes a snapshot of both, encrypts it and stores it as a profile. When you click **Switch**, it closes the Launcher, moves the current `auth` folder to a backup, restores the selected profile's snapshot, and (optionally) starts the Launcher again — now signed in to that account.
 
 Profiles are encrypted either with your password (protected profiles) or with Windows DPAPI only (password-free profiles) — see [Security](#-security).
 
