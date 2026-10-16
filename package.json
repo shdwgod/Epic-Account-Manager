@@ -1,0 +1,30 @@
+{
+  "name": "epic-account-manager",
+  "version": "1.0.0",
+  "description": "Epic Account Manager",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.local.epicaccountmanager",
+    "productName": "Epic Account Manager",
+    "files": ["main.js", "preload.js", "index.html", "styles.css", "renderer.js", "package.json", "icon.ico"],
+    "asarUnpack": ["**/node_modules/koffi/**"],
+    "win": {
+      "target": ["portable"],
+      "icon": "icon.ico",
+      "signAndEditExecutable": true
+    }
+  }
+}

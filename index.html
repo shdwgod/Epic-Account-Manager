@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Epic Account Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="brand">
+        <span class="logo" id="logo"></span>
+        <span>Epic Account Manager</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <h1>Accounts</h1>
+          <p class="sub">Switch between Epic Games accounts in one click.</p>
+        </div>
+        <div class="hero-actions">
+          <button class="btn ghost" id="btnSettings"></button>
+          <button class="btn primary" id="btnSave"></button>
+        </div>
+      </section>
+
+      <section id="grid" class="grid"></section>
+
+      <section id="empty" class="empty hidden">
+        <div class="empty-icon" id="emptyIcon"></div>
+        <h2>No saved accounts yet</h2>
+        <p>Sign in to the Epic Games Launcher, then click <b>Save current account</b> to store it here.</p>
+      </section>
+    </main>
+
+    <div id="busy" class="busy hidden">
+      <div class="spinner"></div>
+      <p id="busyText">Working…</p>
+    </div>
+    <div id="toasts" class="toasts"></div>
+    <div id="modalRoot"></div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
