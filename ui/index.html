@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Epic Account Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="ambient" class="ambient" aria-hidden="true"></div>
+
+  <div id="shell" class="shell">
+    <div id="viewHome" class="home">
+      <header class="topbar">
+        <div class="topbar-tools">
+          <label class="search" id="searchWrap">
+            <span id="searchIcon"></span>
+            <input id="search" type="search" autocomplete="off" spellcheck="false" />
+          </label>
+          <button class="icon-btn round" id="btnSettings" type="button"></button>
+        </div>
+      </header>
+
+      <main id="main" class="stage">
+        <div class="picker">
+          <h1 id="pageTitle" class="picker-title"></h1>
+          <section id="session" class="status" aria-live="polite"></section>
+
+          <section id="grid" class="accounts" role="list"></section>
+          <section id="empty" class="empty" hidden></section>
+
+          <button id="btnManage" class="btn outline manage" type="button"></button>
+        </div>
+      </main>
+    </div>
+
+    <main id="viewSettings" class="page" hidden></main>
+  </div>
+
+  <div id="dialogs"></div>
+  <div id="menuRoot"></div>
+  <div id="busy" class="busy" hidden><div id="busyArt" class="busy-art"></div><p id="busyText" class="busy-title"></p><p id="busySub" class="busy-sub"></p></div>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <script src="strings.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

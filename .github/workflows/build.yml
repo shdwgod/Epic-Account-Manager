@@ -1,0 +1,162 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  APP_NAME: Epic Account Manager
+
+jobs:
+  ui:
+    name: UI checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Syntax check
+        run: |
+          node --check ui/strings.js
+          node --check ui/renderer.js
+          node --check ui-dev/mock-api.js
+          node --check ui-dev/serve.mjs
+
+  build:
+    name: Test and build (Windows)
+    needs: ui
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Read version from Cargo.toml
+        shell: pwsh
+        run: |
+          $meta = cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
+          $version = $meta.packages[0].version
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Version: $version"
+
+      - name: Tag must match the version in Cargo.toml
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -ne "v$env:VERSION") {
+            throw "Tag '$env:GITHUB_REF_NAME' does not match Cargo.toml version '$env:VERSION'. Bump the version or retag."
+          }
+
+      - name: Test
+        run: cargo test --release --locked
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package application and installer
+        shell: pwsh
+        run: |
+          $exe = "target/release/epic-account-manager.exe"
+          if (-not (Test-Path $exe)) { throw "Build output is missing." }
+          $size = (Get-Item $exe).Length
+          Write-Host "Built $exe ($size bytes)"
+          if ($size -lt 256KB) { throw "Build output is suspiciously small ($size bytes)." }
+
+          New-Item -ItemType Directory -Path dist | Out-Null
+          $final = "dist/$env:APP_NAME.exe"
+          Copy-Item $exe $final
+
+          $webView2 = "dist/MicrosoftEdgeWebView2Setup.exe"
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $webView2
+          $signature = Get-AuthenticodeSignature $webView2
+          if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft") {
+            throw "The downloaded WebView2 bootstrapper does not have a valid Microsoft signature."
+          }
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler was not found." }
+          & $iscc "/DMyAppVersion=$env:VERSION" "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE." }
+
+          $zip = "dist/Epic-Account-Manager-v$env:VERSION-windows-portable.zip"
+          Compress-Archive -Path $final -DestinationPath $zip
+
+          $installer = "dist/Epic Account Manager Setup.exe"
+          if (-not (Test-Path $installer)) { throw "Installer output is missing." }
+
+          $lines = foreach ($file in @($final, $zip, $installer)) {
+            "$((Get-FileHash $file -Algorithm SHA256).Hash.ToLower())  $(Split-Path $file -Leaf)"
+          }
+          $lines | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: Epic Account Manager Setup
+          path: dist/Epic Account Manager Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v7
+        with:
+          name: Epic Account Manager Portable
+          path: dist/Epic-Account-Manager-v*-windows-portable.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload release files
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files
+          path: |
+            dist/Epic Account Manager Setup.exe
+            dist/Epic-Account-Manager-v*-windows-portable.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish release
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-files
+          path: dist
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: Epic Account Manager ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/Epic Account Manager Setup.exe
+            dist/Epic-Account-Manager-v*-windows-portable.zip
+            dist/SHA256SUMS.txt
