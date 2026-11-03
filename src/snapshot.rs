@@ -94,7 +94,30 @@ pub fn restore(epic_data: &Path, files: &BTreeMap<String, String>) -> Result<()>
     Ok(())
 }
 
-/// The signed-in account's display name from the Launcher's `auth.json`.
+/// The signed-in account's email from the Launcher's `auth.json`.
+pub fn read_email(epic_data: &Path) -> Option<String> {
+    AUTH_JSON.iter().find_map(|rel| email_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
+}
+
+/// The email stored in a previously captured Launcher session.
+pub fn read_email_from_snapshot(files: &BTreeMap<String, String>) -> Option<String> {
+    AUTH_JSON.iter().find_map(|rel| {
+        let encoded = files.get(*rel)?;
+        let decoded = STANDARD.decode(encoded).ok()?;
+        email_from_json(std::str::from_utf8(&decoded).ok()?)
+    })
+}
+
+fn email_from_json(text: &str) -> Option<String> {
+    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
+    let root = root.as_object()?;
+    let pick = |env: &Value| -> Option<String> {
+        let email = env.get("account_info")?.get("email")?.as_str()?.trim();
+        (!email.is_empty()).then(|| email.to_string())
+    };
+    root.get("prod").and_then(pick).or_else(|| root.values().find_map(pick))
+}
+
 pub fn read_display_name(epic_data: &Path) -> Option<String> {
     AUTH_JSON.iter().find_map(|rel| display_name_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
 }
@@ -184,6 +207,17 @@ mod tests {
         let other = tempfile::tempdir().unwrap();
         write(&other.path().join("auth.json"), "\u{feff}{ \"gamedev\": { \"account_info\": { \"display_name\": \"Dev\" } } }");
         assert_eq!(read_display_name(other.path()).as_deref(), Some("Dev"));
+    }
+
+    #[test]
+    fn email_is_read_from_auth_json_and_session_snapshots() {
+        let epic = tempfile::tempdir().unwrap();
+        let auth = r#"{ "prod": { "account_info": { "email": " player@example.com ", "display_name": "Player" } } }"#;
+        write(&epic.path().join("auth/auth.json"), auth);
+        assert_eq!(read_email(epic.path()).as_deref(), Some("player@example.com"));
+
+        let files = BTreeMap::from([("auth/auth.json".to_string(), STANDARD.encode(auth))]);
+        assert_eq!(read_email_from_snapshot(&files).as_deref(), Some("player@example.com"));
     }
 
     #[test]
