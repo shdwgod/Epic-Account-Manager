@@ -1,0 +1,56 @@
+[package]
+name = "epic-account-manager"
+version = "2.0.0"
+edition = "2021"
+description = "Epic Account Manager - switch between Epic Games accounts in one click (Rust + WebView2)"
+license = "MIT"
+build = "build.rs"
+
+[lib]
+name = "eam"
+path = "src/lib.rs"
+
+[[bin]]
+name = "epic-account-manager"
+path = "src/main.rs"
+
+[features]
+# Compiles the raw Win32 FFI wrappers on non-Windows hosts so they can be
+# type-checked in CI/dev containers (`cargo check --features win-ffi-check`).
+win-ffi-check = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.23"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+scrypt = "0.12"
+hmac = "0.13"
+sha2 = "0.11"
+getrandom = "0.4"
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security_Credentials",
+  "Win32_Security_Cryptography",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(windows)'.dependencies]
+wry = "0.57"
+tao = "0.37"
+rfd = "0.17"
+raw-window-handle = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
