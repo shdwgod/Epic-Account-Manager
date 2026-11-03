@@ -8,11 +8,12 @@
 - The status banner shows the display name of an account that is not saved yet.
 - **Data folder moved** to `%LOCALAPPDATA%\EpicAccountManager` (profiles, backups and the WebView2 cache are all there now). Data from the old `%USERPROFILE%\EpicAccountManager` is copied over automatically the first time the new folder has no `accounts.json`.
 
-- **Calmer look.** Neutral graphite theme with a single accent; the coloured gradient tiles and background glow are gone. Accounts are neutral unless you pick a colour in *Edit profile*. The list view is the default (the grid is still one click away).
-
 - **Settings** redesigned as grouped rows (launch behaviour, Launcher location with its status, saved accounts folder); the version/disclaimer and shortcut footers are gone.
 
-- **Easier to use.** Every account row now has a visible **Switch** button (the whole row still works), the signed-in account sits in a card at the top with a green ring while the Launcher is running, and the Settings button has a proper cog icon and label. Sort, layout and search only appear once the list is long enough to need them (3 and 6 accounts). The extra "add" tile is gone; **Save current account** lives in the header.
+- **New home screen, profile-picker style.** Accounts are big tiles in the middle of the window. Hovering (or tabbing to) a tile lifts it, rings it in white, shows a **Switch** cue and tints the background with the account's colour; the tiles rise in once on start. The last tile saves the account the Launcher is signed in to (or explains how to add one). **Manage accounts** turns every tile into an edit button, and *Edit profile* now has *Delete profile* in it. Pin, update and delete are still in the tile's ⋯ menu and the right-click menu.
+- No app name in the top bar (the window title already has it). The Launcher state, the signed-in account and its actions sit in one capsule under the title instead of a card; the active account carries an **Active** badge.
+- Accounts get a stable, distinct colour of their own (change it in *Edit profile*, **Auto** goes back to the default). The list view, the layout switch and the sort box are gone; **Order accounts by** moved to Settings, and search (6+ accounts) is a search icon in the top bar.
+- Buttons are pills, the main action is white, and the UI dev mock data uses English names only.
 - **Settings is now a page** instead of a pop-up: big rows, the whole "Open Launcher after switching" row toggles, and the Launcher path is shown in full with a clear status (found automatically / your own file / not found). `Esc` or **Back** returns to the accounts.
 
 ### Removed

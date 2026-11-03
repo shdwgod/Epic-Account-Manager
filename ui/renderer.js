@@ -50,12 +50,12 @@ function icon(name) {
 
 /* UI-only preferences live in localStorage (the profile data stays in the Rust core). */
 const prefs = (() => {
-  const defaults = { view: 'list', sort: 'used' };
+  const defaults = { sort: 'used' };
   let data = { ...defaults };
   try { data = { ...defaults, ...JSON.parse(localStorage.getItem('eam.prefs') || '{}') }; } catch { /* ignore */ }
   return {
-    ...data,
-    save() { try { localStorage.setItem('eam.prefs', JSON.stringify({ view: this.view, sort: this.sort })); } catch { /* ignore */ } },
+    sort: ['used', 'name', 'saved'].includes(data.sort) ? data.sort : defaults.sort,
+    save() { try { localStorage.setItem('eam.prefs', JSON.stringify({ sort: this.sort })); } catch { /* ignore */ } },
   };
 })();
 
@@ -67,8 +67,29 @@ let busy = false;
 let statusSeq = 0;
 let view = 'home'; // 'home' | 'settings'
 let openDialogCtl = null;
+let managing = false;    // "Manage accounts": tiles open the editor instead of switching
+let introPending = true; // the tiles rise in once, on the first render with accounts
 
 const HUES = [8, 32, 48, 140, 175, 210, 262, 320];
+
+const hashOf = (str) => { let n = 5381; for (const ch of str) n = ((n << 5) + n + ch.charCodeAt(0)) | 0; return Math.abs(n); };
+let autoHues = new Map(); // account id -> colour, for accounts whose owner has not picked one
+
+/* An account keeps the colour its owner picked. The others get one from the same set: stable per account, and
+   different from each other for as long as there are free colours. */
+function computeAutoHues() {
+  const taken = new Set(state.profiles.filter((p) => p.hue != null).map((p) => p.hue));
+  const byAge = state.profiles.filter((p) => p.hue == null).sort((a, b) => stamp(a.saved) - stamp(b.saved) || a.name.localeCompare(b.name));
+  autoHues = new Map();
+  for (const p of byAge) {
+    const key = p.username || p.name;
+    let i = hashOf(key) % HUES.length;
+    for (let n = 0; n < HUES.length && taken.has(HUES[i]); n++) i = (i + 1) % HUES.length;
+    autoHues.set(key, HUES[i]);
+    taken.add(HUES[i]);
+  }
+}
+const hueOf = (p) => p.hue ?? autoHues.get(p.username || p.name) ?? HUES[hashOf(p.username || p.name || '') % HUES.length];
 
 const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/gi, 'l').toLowerCase();
 const stamp = (s) => { const n = s ? new Date(s.replace(' ', 'T')).getTime() : 0; return Number.isNaN(n) ? 0 : n; };
@@ -91,8 +112,17 @@ function ago(s) {
 
 function avatarEl(p, cls = '') {
   const el = h('div', { class: `avatar ${cls}` }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : (p.name.trim().charAt(0) || '?'));
-  if (p.hue != null) { el.classList.add('tinted'); el.style.setProperty('--h', p.hue); } // colour only if the user picked one
+  el.style.setProperty('--h', hueOf(p));
   return el;
+}
+
+/* The background glow takes the colour of the hovered account and rests on the active one. */
+function setGlow(hue) {
+  const el = $('#ambient');
+  if (hue != null) { el.style.setProperty('--gh', hue); el.className = 'ambient on'; return; }
+  const act = activeProfile();
+  if (act) el.style.setProperty('--gh', hueOf(act));
+  el.className = act ? 'ambient idle' : 'ambient';
 }
 
 /* --------------------------------------------------------------------- api */
@@ -111,6 +141,7 @@ async function call(promise) {
 }
 function applyState(data) {
   state = { profiles: data.profiles, settings: data.settings, version: data.version || state.version };
+  computeAutoHues();
   renderAll();
 }
 
@@ -135,7 +166,7 @@ function toast(message, type = 'ok', action = null) {
 }
 
 /* ------------------------------------------------------------------ dialogs */
-function openDialog({ title, hint, children = [], confirm, danger = false, hideCancel = false, onSubmit }) {
+function openDialog({ title, hint, children = [], confirm, danger = false, hideCancel = false, extra = null, onSubmit }) {
   return new Promise((resolve) => {
     const previous = document.activeElement;
     const err = h('p', { class: 'form-error', role: 'alert' });
@@ -145,6 +176,7 @@ function openDialog({ title, hint, children = [], confirm, danger = false, hideC
       hint ? h('p', { class: 'hint' }, hint) : null,
       ...children, err,
       h('div', { class: 'dialog-actions' },
+        extra ? h('div', { class: 'dialog-extra' }, extra) : null,
         hideCancel ? null : h('button', { type: 'button', class: 'btn', onclick: () => close(null) }, t('common.cancel')),
         okBtn));
     const backdrop = h('div', { class: 'backdrop', onmousedown: (e) => { if (e.target === backdrop && !busy) close(null); } }, form);
@@ -239,68 +271,55 @@ function profileMenu(p, x, y, tile) {
 }
 
 /* ---------------------------------------------------------------- rendering */
-const SORT_MIN = 3;    // sort + layout switch only appear once there is something to sort
-const SEARCH_MIN = 6;  // search only appears once the list is long enough to need it
+const SEARCH_MIN = 6; // search only appears once the list is long enough to need it
+
+function syncSearch() { $('#searchWrap').classList.toggle('filled', !!query); }
+
+function setManaging(on) {
+  managing = on;
+  renderStatic();
+  renderGrid();
+}
 
 function renderStatic() {
-  const n = state.profiles.length;
-  $('#pageTitle').textContent = t('page.title');
-  $('#btnSettings').replaceChildren(icon('gear'), t('bar.settings'));
-  $('#btnSave').replaceChildren(icon('plus'), t('bar.save'));
-  $('#listTitle').replaceChildren(t('list.title'), h('span', { class: 'count' }, String(n)));
+  $('#btnSettings').replaceChildren(icon('gear'));
+  $('#btnSettings').title = t('bar.settings');
+  $('#btnSettings').setAttribute('aria-label', t('bar.settings'));
   $('#searchIcon').innerHTML = ICONS.search;
   $('#search').placeholder = t('toolbar.search');
   $('#search').setAttribute('aria-label', t('toolbar.search'));
-  $('#sortChevron').innerHTML = ICONS.chevron;
-  $('#sort').replaceChildren(...['used', 'name', 'saved'].map((k) => h('option', { value: k }, t(`sort.${k}`))));
-  $('#sort').value = prefs.sort;
-  $('#sort').setAttribute('aria-label', t('toolbar.sort'));
-  $('#viewGrid').replaceChildren(icon('grid'));
-  $('#viewList').replaceChildren(icon('list'));
-  $('#viewGrid').title = t('view.grid');
-  $('#viewList').title = t('view.list');
-  $('#viewGrid').setAttribute('aria-label', t('view.grid'));
-  $('#viewList').setAttribute('aria-label', t('view.list'));
-  $('#viewGrid').setAttribute('aria-pressed', String(prefs.view === 'grid'));
-  $('#viewList').setAttribute('aria-pressed', String(prefs.view === 'list'));
+  $('#viewHome').classList.toggle('managing', managing);
+  $('#pageTitle').textContent = t(managing ? 'manage.title' : 'page.title');
+  $('#btnManage').textContent = t(managing ? 'manage.exit' : 'manage.enter');
 }
 
 function renderSession() {
   const el = $('#session');
-  const running = session?.epicRunning;
-  const chips = [];
-  if (session) {
-    chips.push(h('span', { class: `chip ${running ? 'on' : ''}` }, h('span', { class: 'dot' }), t(running ? 'session.running' : 'session.closed')));
-    if (!launcherFound()) chips.push(h('button', { type: 'button', class: 'chip warn', onclick: openSettings }, t('session.notFound')));
-  }
-  const launch = (primary) => (!session || running || !launcherFound() ? null
-    : h('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick: doLaunch }, icon('play'), t('session.launch')));
-
-  let face, title, sub, actions;
+  if (!session) { el.replaceChildren(h('span', { class: 'skeleton pulse' }, t('session.checking'))); return; }
+  const running = session.epicRunning;
   const act = activeProfile();
-  if (!session) {
-    face = h('div', { class: 'avatar' }, '…');
-    title = h('span', { class: 'skeleton pulse' }, t('session.checking'));
-  } else if (act) {
-    face = avatarEl(act);
-    if (running) face.classList.add('live');
-    title = t('session.active', { name: act.name });
-    sub = [h('span', {}, t('session.activeSub')), ...chips];
-    actions = [h('button', { type: 'button', class: 'btn ghost', onclick: () => doRefresh(act) }, icon('refresh'), t('session.refresh')), launch(true)];
+  const canLaunch = launcherFound() && !running;
+  const action = (label, ic, run, primary = false) =>
+    h('button', { type: 'button', class: `btn small ${primary ? 'primary' : 'ghost'}`, onclick: run }, icon(ic), label);
+
+  // One capsule, three kinds of segment: Launcher state, who is signed in, what you can do about it.
+  const info = [h('span', { class: `seg chip${running ? ' on' : ''}` }, h('span', { class: 'dot' }), t(running ? 'session.running' : 'session.closed'))];
+  if (!launcherFound()) info.push(h('button', { type: 'button', class: 'seg chip warn', onclick: openSettings }, t('session.notFound')));
+  const actions = [];
+  if (act) {
+    info.push(h('span', { class: 'seg' }, t('session.active', { name: act.name })));
+    actions.push(action(t('session.refresh'), 'refresh', () => doRefresh(act)));
+    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch, true));
   } else if (session.username) {
-    face = h('div', { class: 'avatar' }, '?');
-    title = t('session.unsaved');
-    sub = [h('span', {}, t('session.unsavedSub', { id: session.displayName || shortId(session.username) })), ...chips];
-    actions = [launch(false), h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('session.saveThis'))];
+    info.push(h('span', { class: 'seg' }, t('session.unsaved', { id: session.displayName || shortId(session.username) })));
+    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch));
+    actions.push(action(t('session.saveThis'), 'plus', () => doSave(), true));
   } else {
-    face = h('div', { class: 'avatar' }, '–');
-    title = t('session.out');
-    sub = [h('span', {}, t('session.outSub')), ...chips];
-    actions = [launch(true)];
+    info.push(h('span', { class: 'seg' }, t('session.out')));
+    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch, true));
   }
-  el.replaceChildren(face,
-    h('div', { class: 'session-text' }, h('div', { class: 'session-title' }, title), sub ? h('div', { class: 'session-sub' }, ...sub) : null),
-    h('div', { class: 'session-actions' }, ...(actions || [])));
+  if (actions.length) info.push(h('span', { class: 'status-actions' }, ...actions));
+  el.replaceChildren(...info);
 }
 
 function visibleProfiles() {
@@ -315,61 +334,96 @@ function visibleProfiles() {
     .sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || by[prefs.sort](a, b));
 }
 
-function renderTile(p) {
+function renderTile(p, index, animate) {
   const active = p.name === session?.activeProfile;
-  const tile = h('article', { class: `tile${active ? ' active' : ''}${p.hue != null ? ' tinted' : ''}`, role: 'listitem', 'data-name': p.name });
-  if (p.hue != null) tile.style.setProperty('--h', p.hue);
+  const tile = h('article', { class: `tile${active ? ' active' : ''}${animate ? ' enter' : ''}`, role: 'listitem', 'data-name': p.name });
+  tile.style.setProperty('--h', hueOf(p));
+  tile.style.setProperty('--i', index);
 
   const meta = p.legacy
     ? h('span', { class: 'tile-meta warn', title: t('tile.legacy') }, icon('alert'), t('tile.legacyShort'))
     : h('span', { class: 'tile-meta', title: p.saved || '' }, p.lastUsed ? t('tile.used', { when: ago(p.lastUsed) }) : t('tile.neverUsed'));
-  const cue = active
-    ? h('span', { class: 'cue live' }, h('span', { class: 'dot' }), t('tile.active'))
-    : h('span', { class: 'cue' }, icon('swap'), t('tile.switchCue'));
 
-  const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': t('tile.switch', { name: p.name }), onclick: () => doSwitch(p) },
-    h('span', { class: 'tile-art' }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : h('span', { class: 'tile-initial' }, p.name.trim().charAt(0) || '?')),
-    h('span', { class: 'tile-body' },
-      h('span', { class: 'tile-name', title: p.name }, h('span', { class: 'tile-name-text' }, p.name), p.pinned ? h('span', { class: 'flag', title: t('tile.pinned') }, icon('pin')) : null),
-      meta),
-    cue);
+  const art = h('span', { class: 'tile-art' },
+    p.avatar ? h('img', { src: p.avatar, alt: '' }) : h('span', { class: 'tile-initial' }, p.name.trim().charAt(0) || '?'),
+    h('span', { class: 'tile-sheen' }),
+    active ? h('span', { class: 'tile-badge' }, h('span', { class: 'dot' }), t('tile.active')) : h('span', { class: 'tile-switch' }, icon('swap'), t('tile.switchCue')),
+    h('span', { class: 'tile-edit' }, icon('pencil')));
+  art.addEventListener('pointermove', (e) => {
+    const r = art.getBoundingClientRect();
+    art.style.setProperty('--mx', `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+    art.style.setProperty('--my', `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+  });
 
-  const more = h('button', { type: 'button', class: 'icon-btn tile-menu', 'aria-label': t('tile.more'), 'aria-haspopup': 'menu' }, icon('dots'));
+  const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': t(managing ? 'tile.edit' : 'tile.switch', { name: p.name }), onclick: () => (managing ? doEdit(p) : doSwitch(p)) },
+    art,
+    h('span', { class: 'tile-name', title: p.name }, h('span', { class: 'tile-name-text' }, p.name), p.pinned ? h('span', { class: 'flag', title: t('tile.pinned') }, icon('pin')) : null),
+    meta);
+
+  const more = h('button', { type: 'button', class: 'tile-menu', 'aria-label': t('tile.more'), 'aria-haspopup': 'menu' }, icon('dots'));
   more.addEventListener('click', (e) => { e.stopPropagation(); const r = more.getBoundingClientRect(); profileMenu(p, r.right - 210, r.bottom + 4, tile); });
   tile.addEventListener('contextmenu', (e) => { e.preventDefault(); profileMenu(p, e.clientX, e.clientY, tile); });
+  tile.addEventListener('pointerenter', () => setGlow(hueOf(p)));
+  tile.addEventListener('pointerleave', () => setGlow(null));
+  main.addEventListener('focus', () => { if (main.matches(':focus-visible')) setGlow(hueOf(p)); });
+  main.addEventListener('blur', () => setGlow(null));
 
   tile.append(main, more);
   return tile;
 }
 
+/* The last tile: saves the account the Launcher is signed in to, or explains how to add one. */
+function renderAddTile(index, animate) {
+  const unsaved = !!session?.username && !activeProfile();
+  const label = unsaved ? t('tile.saveNamed', { name: session.displayName || shortId(session.username) }) : t('tile.add');
+  const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': label, onclick: unsaved ? () => doSave() : showAddHelp },
+    h('span', { class: 'tile-art' }, icon('plus')),
+    h('span', { class: 'tile-name', title: label }, h('span', { class: 'tile-name-text' }, label)));
+  const tile = h('article', { class: `tile add${unsaved ? ' cta' : ''}${animate ? ' enter' : ''}`, role: 'listitem' }, main);
+  tile.style.setProperty('--i', index);
+  return tile;
+}
+
 function renderGrid() {
   const focused = document.activeElement?.closest?.('.tile')?.dataset.name;
+  const list = visibleProfiles();
+  const animate = introPending && list.length > 0;
+  const tiles = list.map((p, i) => renderTile(p, i, animate));
+  if (!query) tiles.push(renderAddTile(list.length, animate));
   const grid = $('#grid');
-  grid.className = `accounts view-${prefs.view === 'grid' ? 'grid' : 'list'}`;
-  grid.replaceChildren(...visibleProfiles().map(renderTile));
+  grid.replaceChildren(...tiles);
+  if (animate) introPending = false;
   if (focused) grid.querySelector(`.tile[data-name="${CSS.escape(focused)}"] .tile-main`)?.focus();
+  setGlow(null);
+}
+
+function renderSteps() {
+  return h('ol', { class: 'steps' }, h('li', {}, t('empty.step1')), h('li', {}, t('empty.step2')), h('li', {}, t('empty.step3')));
+}
+
+function showAddHelp() {
+  if (busy || openDialogCtl) return;
+  openDialog({ title: t('add.title'), hint: t('empty.text'), children: [renderSteps()], confirm: t('common.done'), hideCancel: true });
 }
 
 function renderEmpty() {
   const total = state.profiles.length;
   const noMatch = total > 0 && visibleProfiles().length === 0;
   const empty = $('#empty');
-  if (total < SEARCH_MIN && query) { query = ''; $('#search').value = ''; } // search is hidden, so a stale filter must not linger
+  if (total < SEARCH_MIN && query) { query = ''; $('#search').value = ''; syncSearch(); } // search is hidden, so a stale filter must not linger
+  if (total === 0 && managing) { managing = false; renderStatic(); }
   empty.hidden = !(total === 0 || noMatch);
-  $('#listHead').hidden = total === 0;
-  $('#filters').hidden = total < SORT_MIN;
   $('#searchWrap').hidden = total < SEARCH_MIN;
-  $('#btnSave').hidden = total === 0; // the empty state has its own call to action
+  $('#btnManage').hidden = total === 0;
   $('#grid').hidden = total === 0 || noMatch;
   if (empty.hidden) return;
   if (total === 0) {
     empty.replaceChildren(
-      h('h2', {}, t('empty.title')), h('p', {}, t('empty.text')),
-      h('ol', {}, h('li', {}, t('empty.step1')), h('li', {}, t('empty.step2')), h('li', {}, t('empty.step3'))),
+      h('h2', {}, t('empty.title')), h('p', {}, t('empty.text')), renderSteps(),
       h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('bar.save')));
   } else {
     empty.replaceChildren(h('h2', {}, t('empty.none', { q: query.trim() })),
-      h('button', { type: 'button', class: 'btn', onclick: () => { query = ''; $('#search').value = ''; renderAll(); } }, t('empty.clear')));
+      h('button', { type: 'button', class: 'btn outline', onclick: () => { query = ''; $('#search').value = ''; syncSearch(); renderAll(); } }, t('empty.clear')));
   }
 }
 
@@ -386,12 +440,13 @@ async function refreshStatus() {
   const seq = ++statusSeq;
   const res = await rpc(window.api.status());
   if (!res.ok || seq !== statusSeq || busy) return;
-  const changed = JSON.stringify(res.data) !== JSON.stringify(session);
-  const activeChanged = res.data.activeProfile !== session?.activeProfile;
+  const prev = session;
+  const changed = JSON.stringify(res.data) !== JSON.stringify(prev);
+  const tilesChanged = res.data.activeProfile !== prev?.activeProfile || res.data.username !== prev?.username || res.data.displayName !== prev?.displayName;
   session = res.data;
   if (!changed) return;
   renderSession();
-  if (activeChanged) renderGrid();
+  if (tilesChanged) renderGrid();
 }
 
 /* ----------------------------------------------------------------- actions */
@@ -476,7 +531,7 @@ async function doEdit(p) {
   let hue = p.hue ?? null;
   const name = textField(t('save.name'), { value: p.name });
   const preview = h('div');
-  const draw = () => preview.replaceChildren(avatarEl({ name: name.input.value || p.name, avatar: pic, hue }));
+  const draw = () => preview.replaceChildren(avatarEl({ name: name.input.value || p.name, username: p.username, avatar: pic, hue }));
   name.input.addEventListener('input', draw);
   draw();
 
@@ -485,7 +540,7 @@ async function doEdit(p) {
   const swatches = h('div', { class: 'swatches', role: 'group' });
   const paintSwatches = () => swatches.replaceChildren(
     ...[null, ...HUES].map((v) => {
-      const b = h('button', { type: 'button', class: `swatch${v === null ? ' auto' : ''}`, 'aria-pressed': String(v === hue), title: v === null ? t('edit.auto') : '', 'aria-label': v === null ? t('edit.auto') : `${v}°` });
+      const b = h('button', { type: 'button', class: `swatch${v === null ? ' auto' : ''}`, 'aria-pressed': String(v === hue), title: v === null ? t('edit.auto') : '', 'aria-label': v === null ? t('edit.auto') : `${v}°` }, v === null ? 'A' : null);
       if (v !== null) b.style.setProperty('--h', v);
       b.addEventListener('click', () => { hue = v; paintSwatches(); draw(); });
       return b;
@@ -494,6 +549,7 @@ async function doEdit(p) {
 
   await openDialog({
     title: t('edit.title'), confirm: t('edit.confirm'),
+    extra: h('button', { type: 'button', class: 'btn ghost danger-text', onclick: () => { openDialogCtl?.close(null); doDelete(p); } }, icon('trash'), t('delete.title')),
     children: [
       h('div', { class: 'edit-top' }, preview, h('div', { class: 'col' }, h('div', { class: 'label' }, t('edit.picture')), choose, remove)),
       name.el,
@@ -541,6 +597,7 @@ function showView(next) {
   $('#viewHome').hidden = next !== 'home';
   $('#viewSettings').hidden = next !== 'settings';
   $('#main').scrollTop = 0;
+  $('#viewSettings').scrollTop = 0;
 }
 
 function closeSettings() {
@@ -592,21 +649,30 @@ function renderSettings() {
     if (data) applyState(data); else launchInput.checked = !launchInput.checked;
   });
 
+  // -- Order of the accounts on the home screen
+  const sortSelect = h('select', { 'aria-label': t('settings.order') }, ...['used', 'name', 'saved'].map((k) => h('option', { value: k }, t(`sort.${k}`))));
+  sortSelect.value = prefs.sort;
+  sortSelect.addEventListener('change', () => { prefs.sort = sortSelect.value; prefs.save(); renderGrid(); });
+  const chevron = h('span'); chevron.innerHTML = ICONS.chevron;
+
   const section = (title, ...rows) => h('section', {}, h('h2', { class: 'group-title' }, title), h('div', { class: 'group' }, ...rows));
 
-  root.replaceChildren(
+  root.replaceChildren(h('div', { class: 'page-inner' },
     h('button', { type: 'button', class: 'btn ghost back', onclick: closeSettings }, icon('chevronLeft'), t('settings.back')),
     h('header', { class: 'settings-head' }, h('h1', {}, t('settings.title'))),
     section(t('settings.general'),
       h('label', { class: 'setting' },
         h('div', { class: 'setting-text' }, h('b', {}, t('settings.launch')), h('p', {}, t('settings.launchText'))),
-        h('span', { class: 'switch' }, launchInput, h('span', { class: 'slider' })))),
+        h('span', { class: 'switch' }, launchInput, h('span', { class: 'slider' }))),
+      h('div', { class: 'setting' },
+        h('div', { class: 'setting-text' }, h('b', {}, t('settings.order')), h('p', {}, t('settings.orderText'))),
+        h('span', { class: 'select' }, sortSelect, chevron))),
     section(t('settings.launcherSection'),
       h('div', { class: 'setting stack' }, status, help, pathBox, h('div', { class: 'row-actions' }, choose, auto))),
     section(t('settings.dataSection'),
       h('div', { class: 'setting' },
         h('div', { class: 'setting-text' }, h('b', {}, t('settings.dataTitle')), h('p', {}, t('settings.dataText'))),
-        h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.openData')))));
+        h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.openData'))))));
 }
 
 /* -------------------------------------------------------------- shortcuts */
@@ -636,7 +702,8 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && !typing)) { e.preventDefault(); if (!$('#searchWrap').hidden) { $('#search').focus(); $('#search').select(); } }
   else if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doSave(); }
   else if (e.ctrlKey && e.key === ',') { e.preventDefault(); openSettings(); }
-  else if (e.key === 'Escape' && e.target.id === 'search') { query = ''; e.target.value = ''; e.target.blur(); renderAll(); }
+  else if (e.key === 'Escape' && e.target.id === 'search') { query = ''; e.target.value = ''; e.target.blur(); syncSearch(); renderAll(); }
+  else if (e.key === 'Escape' && managing) setManaging(false);
   else if (e.key.startsWith('Arrow') && !typing && moveFocus(e.key)) e.preventDefault();
 });
 
@@ -648,13 +715,9 @@ document.addEventListener('contextmenu', (e) => { if (!e.target.closest('.tile')
 async function init() {
   renderStatic();
   if (!window.api) { $('#main').replaceChildren(h('p', { class: 'hint' }, t('app.apiMissing'))); return; }
-  $('#btnSave').addEventListener('click', () => doSave());
   $('#btnSettings').addEventListener('click', openSettings);
-  $('#search').addEventListener('input', (e) => { query = e.target.value; renderGrid(); renderEmpty(); });
-  $('#sort').addEventListener('change', (e) => { prefs.sort = e.target.value; prefs.save(); renderGrid(); });
-  for (const [id, view] of [['#viewGrid', 'grid'], ['#viewList', 'list']]) {
-    $(id).addEventListener('click', () => { prefs.view = view; prefs.save(); renderStatic(); renderGrid(); });
-  }
+  $('#btnManage').addEventListener('click', () => setManaging(!managing));
+  $('#search').addEventListener('input', (e) => { query = e.target.value; syncSearch(); renderGrid(); renderEmpty(); });
   renderSession();
 
   const data = await call(window.api.state());

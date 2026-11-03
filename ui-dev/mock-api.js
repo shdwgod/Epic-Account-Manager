@@ -5,11 +5,11 @@
   const ago = (min) => { const d = new Date(Date.now() - min * 60000); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
   let profiles = q.has('empty') ? [] : [
     { name: 'Main account', username: 'a1b2c3d4e5f60718293a4b5c6d7e8f90', saved: ago(60 * 24 * 40), lastUsed: ago(25), avatar: null, legacy: false, pinned: true, hue: null },
-    { name: 'Zosia', username: 'b2c3d4e5f60718293a4b5c6d7e8f90a1', saved: ago(60 * 24 * 9), lastUsed: ago(60 * 30), avatar: null, legacy: false, pinned: false, hue: 320 },
+    { name: 'Ava', username: 'b2c3d4e5f60718293a4b5c6d7e8f90a1', saved: ago(60 * 24 * 9), lastUsed: ago(60 * 30), avatar: null, legacy: false, pinned: false, hue: 320 },
     { name: 'Smurf', username: 'c3d4e5f60718293a4b5c6d7e8f90a1b2', saved: ago(60 * 24 * 3), lastUsed: null, avatar: null, legacy: true, pinned: false, hue: null },
-    { name: 'Łukasz – Fortnite', username: 'd4e5f60718293a4b5c6d7e8f90a1b2c3', saved: ago(60 * 24 * 90), lastUsed: ago(60 * 24 * 6), avatar: null, legacy: false, pinned: false, hue: 175 },
+    { name: 'Luke – Fortnite', username: 'd4e5f60718293a4b5c6d7e8f90a1b2c3', saved: ago(60 * 24 * 90), lastUsed: ago(60 * 24 * 6), avatar: null, legacy: false, pinned: false, hue: 175 },
   ];
-  if (q.has('many')) ['Kasia', 'Bartek', 'Ola – Rocket League', 'Michał'].forEach((n, i) => profiles.push({ name: n, username: `e${i}e5f60718293a4b5c6d7e8f90a1b2c3d4`, saved: ago(60 * 24 * (i + 5)), lastUsed: ago(60 * 24 * (i + 8)), avatar: null, legacy: false, pinned: false, hue: null }));
+  if (q.has('many')) ['Kate', 'Ben', 'Olivia – Rocket League', 'Mike'].forEach((n, i) => profiles.push({ name: n, username: `e${i}e5f60718293a4b5c6d7e8f90a1b2c3d4`, saved: ago(60 * 24 * (i + 5)), lastUsed: ago(60 * 24 * (i + 8)), avatar: null, legacy: false, pinned: false, hue: null }));
   let settings = { launchAfterSwitch: true, epicPath: '', resolvedEpicPath: 'C:\\Program Files (x86)\\Epic Games\\Launcher\\Portal\\Binaries\\Win32\\EpicGamesLauncher.exe' };
   if (q.has('nolauncher')) settings.resolvedEpicPath = '';
   let active = q.has('empty') || q.has('signedout') || q.has('unsaved') ? null : 'Main account';

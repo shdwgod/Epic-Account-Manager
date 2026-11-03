@@ -189,7 +189,7 @@ fn try_run() -> Result<(), String> {
     let load_proxy = proxy.clone();
 
     let webview = WebViewBuilder::new_with_web_context(&mut context)
-        .with_background_color((20, 21, 24, 255))
+        .with_background_color((14, 14, 16, 255))
         .with_initialization_script(BRIDGE_JS)
         .with_custom_protocol("app".into(), |_id, req| serve(req))
         .with_url(format!("{ORIGIN}/"))

@@ -1,144 +1,89 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="Epic Account Manager logo" width="300" />
+<img src="docs/logo.png" alt="Epic Account Manager" width="220" />
 
 # Epic Account Manager
 
-**Switch between your Epic Games accounts in one click**  
-**Works only for new Preview Launcher**
+**Switch between your Epic Games accounts in one click.**
 
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Rust](https://img.shields.io/badge/built%20with-Rust%20%2B%20WebView2-DEA584?logo=rust&logoColor=white)
+![Platform](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-WebView2-DEA584?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-<br />
-
 <a href="https://github.com/shdwgod/Epic-Account-Manager/releases/latest">
-  <img src="https://img.shields.io/badge/Download-for%20Windows-5b7cff?style=for-the-badge&logo=windows&logoColor=white" alt="Download Epic Account Manager for Windows" height="48" />
+  <img src="https://img.shields.io/badge/Download-for%20Windows-5b7cff?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows" height="46" />
 </a>
 
 <br /><br />
 
-<img src="docs/screenshot.png" alt="Epic Account Manager screenshot" width="820" />
+<img src="docs/preview.png" alt="Epic Account Manager" width="900" />
 
 </div>
 
----
+<br />
 
-## ✨ Features
+## Features
 
-- **One-click switching** between any number of saved Epic Games accounts
-- **Live status bar** — see which saved account the Launcher is signed in to, whether it is running, launch it from the app, or save an account it doesn't know yet
-- **Profile picker UI** — big profile tiles (or a compact list), search, sorting, pinning, per-profile colours and pictures; the background glow follows the active / hovered account
-- **No passwords to type** — profiles are protected by Windows DPAPI, so saving and switching are one click
-- **Smart saving** — one click saves the signed-in account and names it after its Epic display name (read from the Launcher's `auth.json`); saving the same account again refreshes its existing profile
-- **Keyboard friendly** — `Ctrl+F` search, `Ctrl+N` save account, `Ctrl+,` settings, arrow keys move between tiles, right-click opens the profile menu
-- **Auto-launch** the Epic Games Launcher after switching (optional); if it cannot be started the switch still counts and you get a warning
-- **Safe by design** — runs fully offline, nothing is sent anywhere
-- **Automatic backups** — the Launcher's previous session data is moved to a backup folder, never deleted outright
-- **Portable** — a single small `.exe`, no installer, no Node.js, no Electron
+- **One click** to switch between any number of saved accounts
+- **No passwords to type**: sessions are saved with Windows DPAPI
+- **Profile picker UI** with colours, pictures, pinning and search
+- **Offline and tiny**: one `.exe`, no installer, no Node.js, no Electron
+- **Safe**: the previous session is backed up before every switch
 
-## 🧠 How it works
+> Works with the new **Preview Launcher** only.
 
-The Epic Games Launcher remembers who is signed in using:
+## Getting started
 
-1. a credential stored in **Windows Credential Manager** (`com.epicgames.eglv2.prod`), and
-2. session files in `%LOCALAPPDATA%\com.epicgames.eglv2\auth`.
+1. Sign in to the Epic Games Launcher and tick **Remember me**.
+2. Open the app and press **Save this account**.
+3. Sign out, sign in to the next account and save it too.
+4. From now on, click an account to switch to it.
 
-When you click **Save current account**, the app closes the Launcher, takes a snapshot of both, encrypts it and stores it as a profile. When you click **Switch**, it closes the Launcher, moves the current `auth` folder to a backup, restores the selected profile's snapshot, and (optionally) starts the Launcher again — now signed in to that account.
+Download the zip from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases), unzip it and run **Epic Account Manager.exe**. It needs the Microsoft Edge WebView2 runtime, which comes with Windows 11 and most Windows 10 installs.
 
-Profiles are encrypted with Windows DPAPI — see [Security](#-security).
+**Shortcuts:** `Ctrl+F` search · `Ctrl+N` save account · `Ctrl+,` settings · `Esc` leave manage mode · right-click a tile for more
 
-## 🚀 Getting started
+## Build from source
 
-### Download
-
-Download `Epic-Account-Manager-vX.Y.Z-windows.zip` from the [Releases page](https://github.com/shdwgod/Epic-Account-Manager/releases), unzip it and run **Epic Account Manager.exe**. Nothing to install. Each release also lists SHA-256 checksums in `SHA256SUMS.txt`. Needs the Microsoft Edge WebView2 runtime, which is built into Windows 11 and most Windows 10 installs.
-
-### Build from source
-
-Requirements: Windows 10 / 11, Epic Games Launcher, [Rust](https://rustup.rs) (stable, MSVC toolchain).
+Needs Windows 10/11 and [Rust](https://rustup.rs) (stable, MSVC).
 
 ```bash
 cargo run --release     # run
-cargo build --release   # -> target/release/epic-account-manager.exe
+cargo build --release   # target/release/epic-account-manager.exe
 cargo test              # core logic tests
 ```
 
-### Working on the UI without Windows
-
-The UI is plain HTML/CSS/JS in `ui/` and is embedded into the exe at build time. To iterate on it in a normal browser with a fake backend:
+The UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
 
 ```bash
-node ui-dev/serve.mjs     # http://localhost:5173
-# options: ?empty  ?signedout  ?unsaved
+node ui-dev/serve.mjs   # http://localhost:5173  (?empty ?signedout ?unsaved ?many ?nolauncher)
 ```
 
-## 📖 Usage
+## How it works
 
-1. Sign in to the Epic Games Launcher with the first account (tick **Remember me**).
-2. In the app click **Save current account**. The profile is named after your Epic display name; no name or password to enter.
-3. Sign out in the Launcher, sign in to your next account and save it the same way.
-4. From now on just click a profile tile.
+The Launcher keeps you signed in with a Windows Credential Manager entry plus session files in `%LOCALAPPDATA%\com.epicgames.eglv2\auth`. Saving takes an encrypted snapshot of both. Switching closes the Launcher, backs up the current session, restores the chosen snapshot and (optionally) starts the Launcher again.
 
-### Profiles saved by older versions
+Data lives in `%LOCALAPPDATA%\EpicAccountManager`: `accounts.json`, the last 3 session backups and the WebView2 cache.
 
-Profiles that were saved with a password can no longer be opened (they are marked with a warning icon). Sign in to that account in the Launcher and use **Update saved session** once; the profile is then password-free.
+## Security
 
-**Tips**
+- Profiles are encrypted with **Windows DPAPI**: they can't be read on another PC or by another Windows user.
+- Anyone using your unlocked Windows account can switch to a saved profile, so use the app on a PC you trust.
+- No network access and no telemetry. The UI runs under a strict Content-Security-Policy.
 
-- Right-click a tile (or use its `⋯` menu) → *Edit profile* to rename it and change its picture or colour; use the menu to pin it, refresh its saved session or delete it.
-- Pinned profiles always stay at the top.
-- Open **Settings** to turn auto-launch on or off, set the Launcher path manually, or open the data folder.
-
-## 🗂 Where data is stored
-
-| What | Location |
-| --- | --- |
-| Profiles & settings | `%LOCALAPPDATA%\EpicAccountManager\accounts.json` |
-| Session backups (last 3) | `%LOCALAPPDATA%\EpicAccountManager\backup\` |
-| WebView2 cache | `%LOCALAPPDATA%\EpicAccountManager\WebView2\` |
-
-Older versions used `%USERPROFILE%\EpicAccountManager`; its contents are copied to the new folder automatically the first time the new folder has no `accounts.json` (the old folder is left untouched).
-
-## 🔒 Security
-
-- **Profiles** are protected by **Windows DPAPI**. They cannot be read on another PC or by another Windows user, but anyone using your unlocked Windows account can switch to them. Use the app only on a PC you trust.
-- The app never talks to the network and has no telemetry.
-- The UI runs in a WebView2 window with a strict Content-Security-Policy (no inline scripts or styles, no remote content).
-- Anyone with access to your unlocked Windows session could use a saved session.
-
-## 🛠 Troubleshooting
+## Troubleshooting
 
 | Problem | Fix |
 | --- | --- |
-| Launcher still opens the old account | Re-save the profile: sign in to that account in the Launcher, then click **Save current account** again. Saved tokens can expire when Epic rotates them. |
-| "saved with a password by an older version" | Sign in to that account in the Launcher and click **Update saved session** (or delete the profile and save it again). |
-| "Could not reset: EBWebView" | The folder was in use. Close any leftover Epic processes and try again. |
-| Launcher not found | Open **Settings → Browse** and select `EpicGamesLauncher.exe`. |
-| Windows SmartScreen warns about the `.exe` | The build is not code-signed. Click **More info → Run anyway**. |
+| The Launcher opens the old account | Sign in to that account, then use **Update saved session** (saved tokens can expire). |
+| An account shows a warning | It was saved with a password by an older version. Sign in to it and use **Update saved session**. |
+| Launcher not found | Open **Settings** and choose `EpicGamesLauncher.exe`. |
+| SmartScreen warns about the `.exe` | The build isn't code-signed. Click **More info → Run anyway**. |
 
-## 📁 Project structure
+## Disclaimer
 
-```
-├── src/
-│   ├── app.rs        # Commands the UI calls (save, switch, setMeta, ...)
-│   ├── store.rs      # accounts.json, atomic writes, backups
-│   ├── crypto.rs     # scrypt + HMAC + DPAPI profile encryption
-│   ├── snapshot.rs   # Launcher session snapshot / restore
-│   ├── shell.rs      # Window, WebView2, IPC bridge (Windows)
-│   └── winplat.rs    # Windows APIs: Credential Manager, processes (Windows)
-├── ui/
-│   ├── index.html    # App shell
-│   ├── styles.css    # Styling
-│   ├── strings.js    # All user-facing text
-│   └── renderer.js   # UI logic
-├── ui-dev/           # Browser preview with a fake backend
-├── tests/            # Integration tests of the core logic
-└── docs/             # Logo and screenshot used in this README
-```
+Unofficial community project, **not affiliated with, endorsed by, or sponsored by Epic Games, Inc.** *Epic Games* and the *Epic Games Launcher* are trademarks of Epic Games, Inc.
 
-## ⚠️ Disclaimer
+## License
 
-This is an unofficial community project and is **not affiliated with, endorsed by, or sponsored by Epic Games, Inc.** *Epic Games* and the *Epic Games Launcher* are trademarks of Epic Games, Inc.
-
+[MIT](LICENSE)

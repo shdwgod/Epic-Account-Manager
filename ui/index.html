@@ -8,43 +8,34 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="ambient" class="ambient" aria-hidden="true"></div>
+
   <div id="shell" class="shell">
-    <main id="main">
-      <div id="viewHome" class="page">
-        <header class="page-head">
-          <h1 id="pageTitle"></h1>
-          <div class="head-actions">
-            <button class="btn ghost" id="btnSettings" type="button"></button>
-            <button class="btn" id="btnSave" type="button"></button>
-          </div>
-        </header>
-
-        <section id="session" class="session" aria-live="polite"></section>
-
-        <div id="listHead" class="list-head">
-          <h2 id="listTitle"></h2>
-          <div id="filters" class="filters">
-            <label class="search" id="searchWrap">
-              <span id="searchIcon"></span>
-              <input id="search" type="search" autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="select">
-              <select id="sort"></select>
-              <span id="sortChevron"></span>
-            </label>
-            <div class="seg-view" role="group">
-              <button type="button" id="viewList"></button>
-              <button type="button" id="viewGrid"></button>
-            </div>
-          </div>
+    <div id="viewHome" class="home">
+      <header class="topbar">
+        <div class="topbar-tools">
+          <label class="search" id="searchWrap">
+            <span id="searchIcon"></span>
+            <input id="search" type="search" autocomplete="off" spellcheck="false" />
+          </label>
+          <button class="icon-btn round" id="btnSettings" type="button"></button>
         </div>
+      </header>
 
-        <section id="grid" class="accounts" role="list"></section>
-        <section id="empty" class="empty" hidden></section>
-      </div>
+      <main id="main" class="stage">
+        <div class="picker">
+          <h1 id="pageTitle" class="picker-title"></h1>
+          <section id="session" class="status" aria-live="polite"></section>
 
-      <div id="viewSettings" class="page" hidden></div>
-    </main>
+          <section id="grid" class="accounts" role="list"></section>
+          <section id="empty" class="empty" hidden></section>
+
+          <button id="btnManage" class="btn outline manage" type="button"></button>
+        </div>
+      </main>
+    </div>
+
+    <main id="viewSettings" class="page" hidden></main>
   </div>
 
   <div id="dialogs"></div>
