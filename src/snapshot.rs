@@ -94,38 +94,9 @@ pub fn restore(epic_data: &Path, files: &BTreeMap<String, String>) -> Result<()>
     Ok(())
 }
 
-/// The signed-in account's display name from the Launcher's `auth.json`
-/// (`{ "prod": { "account_info": { "display_name": "..." } } }`).
-pub fn read_account_id(epic_data: &Path) -> Option<String> {
-    AUTH_JSON.iter().find_map(|rel| account_id_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
-}
-
-pub fn read_email(epic_data: &Path) -> Option<String> {
-    AUTH_JSON.iter().find_map(|rel| email_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
-}
-
-fn email_from_json(text: &str) -> Option<String> {
-    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
-    let root = root.as_object()?;
-    let pick = |env: &Value| -> Option<String> {
-        let email = env.get("account_info")?.get("email")?.as_str()?.trim();
-        (!email.is_empty()).then(|| email.to_string())
-    };
-    root.get("prod").and_then(pick).or_else(|| root.values().find_map(pick))
-}
-
+/// The signed-in account's display name from the Launcher's `auth.json`.
 pub fn read_display_name(epic_data: &Path) -> Option<String> {
     AUTH_JSON.iter().find_map(|rel| display_name_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
-}
-
-fn account_id_from_json(text: &str) -> Option<String> {
-    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
-    let root = root.as_object()?;
-    let pick = |env: &Value| -> Option<String> {
-        let id = env.get("account_info")?.get("account_id")?.as_str()?.trim();
-        (!id.is_empty()).then(|| id.to_string())
-    };
-    root.get("prod").and_then(pick).or_else(|| root.values().find_map(pick))
 }
 
 fn display_name_from_json(text: &str) -> Option<String> {
@@ -213,31 +184,6 @@ mod tests {
         let other = tempfile::tempdir().unwrap();
         write(&other.path().join("auth.json"), "\u{feff}{ \"gamedev\": { \"account_info\": { \"display_name\": \"Dev\" } } }");
         assert_eq!(read_display_name(other.path()).as_deref(), Some("Dev"));
-    }
-
-    #[test]
-    fn account_id_is_read_from_auth_json() {
-        let epic = tempfile::tempdir().unwrap();
-        write(&epic.path().join("auth/auth.json"), r#"{ "prod": { "account_info": { "account_id": "account-123", "display_name": "Player" } } }"#);
-        assert_eq!(read_account_id(epic.path()).as_deref(), Some("account-123"));
-    }
-
-    #[test]
-    fn account_id_is_missing_after_logout() {
-        let epic = tempfile::tempdir().unwrap();
-        assert_eq!(read_account_id(epic.path()), None);
-        write(&epic.path().join("auth/auth.json"), r#"{ "prod": { "account_info": { "display_name": "Player" } } }"#);
-        assert_eq!(read_account_id(epic.path()), None);
-    }
-
-    #[test]
-    fn email_is_read_from_current_auth_json() {
-        let epic = tempfile::tempdir().unwrap();
-        assert_eq!(read_email(epic.path()), None);
-        write(&epic.path().join("auth/auth.json"), r#"{ "prod": { "account_info": { "email": "  player@example.com  " } } }"#);
-        assert_eq!(read_email(epic.path()).as_deref(), Some("player@example.com"));
-        write(&epic.path().join("auth/auth.json"), r#"{ "prod": { "account_info": {} } }"#);
-        assert_eq!(read_email(epic.path()), None);
     }
 
     #[test]
