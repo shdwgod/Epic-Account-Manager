@@ -13,6 +13,8 @@ fn is_false(b: &bool) -> bool {
 pub struct Profile {
     pub v: u8,
     pub username: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_username: Option<String>,
     pub token_encrypted: String,
     #[serde(default)]
     pub saved: Option<String>,
