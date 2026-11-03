@@ -5,6 +5,7 @@ use eam::crypto::{self, Protector};
 use eam::error::Result;
 use eam::model::Token;
 use eam::platform::Platform;
+use eam::snapshot;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +39,7 @@ impl Fake {
     /// Pretend the user signed in to `user` in the launcher. The launcher writes the
     /// account's display name to `auth/auth.json` (left out when `display` is `None`).
     fn sign_in(&self, user: &str, display: Option<&str>, blob_hex: &str, session_marker: &str) {
-        *self.token.lock().unwrap() = Some(Token { username: user.into(), blob_hex: blob_hex.into() });
+        *self.token.lock().unwrap() = Some(Token { username: "credentials".into(), blob_hex: blob_hex.into() });
         let auth = self.epic_data_dir().join("auth");
         let _ = fs::remove_dir_all(&auth);
         fs::create_dir_all(&auth).unwrap();
@@ -173,11 +174,14 @@ fn profile_is_named_after_the_epic_display_name() {
 }
 
 #[test]
-fn without_auth_json_the_account_id_is_the_name() {
+fn saving_without_an_email_fails_without_creating_an_unidentifiable_profile() {
     let (_d, fake, app) = setup();
     fake.sign_in("carol@x", None, "c3c3", "C");
-    let st = ok(save(&app));
-    assert_eq!(names(&st), vec!["carol@x"]);
+    *fake.running.lock().unwrap() = true;
+    let message = err(save(&app));
+    assert!(message.contains("Could not identify the Epic account"), "{message}");
+    assert_eq!(*fake.starts.lock().unwrap(), 1);
+    assert!(names(&ok(app.call("state", &json!({})))).is_empty());
 }
 
 #[test]
@@ -227,20 +231,23 @@ fn status_reports_the_display_name() {
 }
 
 #[test]
-fn status_tracks_credential_manager_identity_after_manual_logout_and_login() {
+fn status_uses_auth_email_not_the_generic_credential_username() {
     let (_d, fake, app) = setup();
-    fake.sign_in("epic-user-alice", Some("Alice"), "a1a1", "A");
+    fake.sign_in("alice@example.com", Some("Alice"), "a1a1", "A");
     ok(save(&app));
 
-    fake.sign_in("epic-user-bob", Some("Bob"), "b2b2", "B");
+    fake.sign_in("bob@example.com", Some("Bob"), "b2b2", "B");
     let status = ok(app.call("status", &json!({})));
-    assert_eq!(status["username"], json!("epic-user-bob"));
+    assert_eq!(status["username"], json!("bob@example.com"));
     assert_eq!(status["displayName"], json!("Bob"));
     assert_eq!(status["activeProfile"], Value::Null);
 
     let saved = ok(save(&app));
     assert_eq!(names(&saved), vec!["Alice", "Bob"]);
     assert_eq!(saved["saved"], json!("Bob"));
+    assert_eq!(profile(&saved, "Alice")["username"], json!("alice@example.com"));
+    assert_eq!(profile(&saved, "Bob")["username"], json!("bob@example.com"));
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
 
     fake.sign_out();
     let status = ok(app.call("status", &json!({})));
@@ -249,25 +256,35 @@ fn status_tracks_credential_manager_identity_after_manual_logout_and_login() {
     assert_eq!(status["activeProfile"], Value::Null);
 }
 
-#[test]
-fn status_and_save_do_not_require_an_email_in_auth_json() {
-    let (_d, fake, app) = setup();
-    fake.sign_in("epic-user-123", Some("Alice"), "a1a1", "A");
-    ok(save(&app));
 
-    let auth = fake.epic_data_dir().join("auth/auth.json");
-    fs::write(&auth, json!({ "prod": { "account_info": { "display_name": "Alice", "country": "PL" } } }).to_string()).unwrap();
+
+#[test]
+fn legacy_profiles_with_generic_credential_username_keep_their_identity() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("player@example.com", Some("Player"), "a1a1", "SESSION-PLAYER");
+    let p: &dyn Protector = &*fake;
+    let snapshot = snapshot::capture(&fake.epic_data_dir(), "a1a1").unwrap();
+    let enc = crypto::encrypt_open(p, &snapshot).unwrap();
+    fs::create_dir_all(fake.data_dir()).unwrap();
+    fs::write(
+        fake.data_dir().join("accounts.json"),
+        json!({
+            "accounts": {
+                "Player": { "v": 4, "username": "credentials", "token_encrypted": enc }
+            },
+            "settings": { "active_profile": "Player" }
+        }).to_string(),
+    ).unwrap();
 
     let status = ok(app.call("status", &json!({})));
-    assert_eq!(status["username"], json!("epic-user-123"));
-    assert_eq!(status["displayName"], json!("Alice"));
-    assert_eq!(status["activeProfile"], json!("Alice"));
+    assert_eq!(status["username"], json!("player@example.com"));
+    assert_eq!(status["activeProfile"], json!("Player"));
 
     let saved = ok(save(&app));
-    assert_eq!(names(&saved), vec!["Alice"]);
-    assert_eq!(saved["saved"], json!("Alice"));
+    assert_eq!(names(&saved), vec!["Player"]);
+    assert_eq!(profile(&saved, "Player")["username"], json!("player@example.com"));
+    assert_eq!(profile(&saved, "Player")["credential_username"], json!("credentials"));
 }
-
 #[test]
 fn save_then_switch_restores_credential_and_session() {
     let (_d, fake, app) = setup();
@@ -280,7 +297,7 @@ fn save_then_switch_restores_credential_and_session() {
     // Currently Bob; switch to Alice.
     let st = ok(switch(&app, "Alice"));
     let tok = fake.read_token().unwrap();
-    assert_eq!((tok.username.as_str(), tok.blob_hex.as_str()), ("alice@x", "a1a1"));
+    assert_eq!((tok.username.as_str(), tok.blob_hex.as_str()), ("credentials", "a1a1"));
     assert_eq!(fake.session(), "SESSION-ALICE");
     assert!(profile(&st, "Alice")["lastUsed"].is_string());
     assert_eq!(*fake.starts.lock().unwrap(), 1, "launcher restarted after switch");
@@ -294,7 +311,7 @@ fn save_then_switch_restores_credential_and_session() {
     // And back to Bob.
     ok(switch(&app, "Bob"));
     assert_eq!(fake.session(), "SESSION-BOB");
-    assert_eq!(fake.read_token().unwrap().username, "bob@x");
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
 
     assert_eq!(err(switch(&app, "Ghost")), "Profile does not exist.");
 }
@@ -520,7 +537,7 @@ fn switch_still_succeeds_when_the_launcher_cannot_be_started() {
 
     let st = ok(switch(&app, "Alice"));
     assert_eq!(fake.session(), "SESSION-ALICE", "the session was switched");
-    assert_eq!(fake.read_token().unwrap().username, "alice@x");
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
     assert_eq!(st["warnings"], json!(["Epic Games Launcher not found. Set its path in Settings."]));
     assert!(st["warning"].as_str().unwrap().contains("not found"));
     assert!(profile(&st, "Alice")["lastUsed"].is_string(), "the switch is recorded");
