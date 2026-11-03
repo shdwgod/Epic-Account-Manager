@@ -49,7 +49,7 @@ function icon(name) {
 
 /* UI-only preferences live in localStorage (the profile data stays in the Rust core). */
 const prefs = (() => {
-  const defaults = { view: 'grid', sort: 'used' };
+  const defaults = { view: 'list', sort: 'used' };
   let data = { ...defaults };
   try { data = { ...defaults, ...JSON.parse(localStorage.getItem('eam.prefs') || '{}') }; } catch { /* ignore */ }
   return {
@@ -69,12 +69,6 @@ let openDialogCtl = null;
 
 const HUES = [8, 32, 48, 140, 175, 210, 262, 320];
 
-function hueOf(name) {
-  let x = 0;
-  for (const c of name) x = (x * 31 + c.charCodeAt(0)) % 360;
-  return x;
-}
-const profileHue = (p) => (p.hue ?? hueOf(p.name));
 const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/gi, 'l').toLowerCase();
 const stamp = (s) => { const n = s ? new Date(s.replace(' ', 'T')).getTime() : 0; return Number.isNaN(n) ? 0 : n; };
 const shortId = (u) => (u && u.length > 12 ? `${u.slice(0, 4)}…${u.slice(-4)}` : u || '');
@@ -96,7 +90,7 @@ function ago(s) {
 
 function avatarEl(p, cls = '') {
   const el = h('div', { class: `avatar ${cls}` }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : (p.name.trim().charAt(0) || '?'));
-  el.style.setProperty('--h', profileHue(p));
+  if (p.hue != null) { el.classList.add('tinted'); el.style.setProperty('--h', p.hue); } // colour only if the user picked one
   return el;
 }
 
@@ -244,9 +238,6 @@ function profileMenu(p, x, y, tile) {
 }
 
 /* ---------------------------------------------------------------- rendering */
-function setAmbient(hue) { $('#shell').style.setProperty('--ah', hue); }
-function restingHue() { const a = activeProfile(); return a ? profileHue(a) : 222; }
-
 function renderStatic() {
   $('#btnSettings').replaceChildren(icon('gear'));
   $('#btnSettings').title = t('bar.settings');
@@ -279,7 +270,7 @@ function renderSession() {
   let face, title, sub, actions;
   const act = activeProfile();
   if (!session) {
-    face = h('div', { class: 'avatar' }, '…'); face.style.setProperty('--h', 222);
+    face = h('div', { class: 'avatar' }, '…');
     title = h('span', { class: 'skeleton pulse' }, t('session.checking'));
   } else if (act) {
     face = avatarEl(act);
@@ -287,12 +278,12 @@ function renderSession() {
     sub = [h('span', {}, t('session.activeSub')), ...chips];
     actions = [launch, h('button', { type: 'button', class: 'btn ghost', onclick: () => doRefresh(act) }, icon('refresh'), t('session.refresh'))];
   } else if (session.username) {
-    face = h('div', { class: 'avatar' }, '?'); face.style.setProperty('--h', 40);
+    face = h('div', { class: 'avatar' }, '?');
     title = t('session.unsaved');
     sub = [h('span', {}, t('session.unsavedSub', { id: session.displayName || shortId(session.username) })), ...chips];
     actions = [launch, h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('session.saveThis'))];
   } else {
-    face = h('div', { class: 'avatar' }, '–'); face.style.setProperty('--h', 222);
+    face = h('div', { class: 'avatar' }, '–');
     title = t('session.out');
     sub = [h('span', {}, t('session.outSub')), ...chips];
     actions = [launch];
@@ -314,17 +305,15 @@ function visibleProfiles() {
     .sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || by[prefs.sort](a, b));
 }
 
-function renderTile(p, index) {
+function renderTile(p) {
   const active = p.name === session?.activeProfile;
-  const tile = h('article', { class: `tile${active ? ' active' : ''}`, role: 'listitem', 'data-name': p.name });
-  tile.style.setProperty('--h', profileHue(p));
-  tile.style.setProperty('--i', index);
+  const tile = h('article', { class: `tile${active ? ' active' : ''}${p.hue != null ? ' tinted' : ''}`, role: 'listitem', 'data-name': p.name });
+  if (p.hue != null) tile.style.setProperty('--h', p.hue);
 
   const meta = p.lastUsed ? t('tile.used', { when: ago(p.lastUsed) }) : t('tile.neverUsed');
   const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': t('tile.switch', { name: p.name }), onclick: () => doSwitch(p) },
     h('span', { class: 'tile-art' }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : h('span', { class: 'tile-initial' }, p.name.trim().charAt(0) || '?')),
-    h('span', { class: 'tile-body' }, h('span', { class: 'tile-name', title: p.name }, p.name), h('span', { class: 'tile-meta', title: p.saved || '' }, meta)),
-    h('span', { class: 'tile-hint' }, icon('swap'), t('tile.switchHint')));
+    h('span', { class: 'tile-body' }, h('span', { class: 'tile-name', title: p.name }, p.name), h('span', { class: 'tile-meta', title: p.saved || '' }, meta)));
 
   const badges = h('div', { class: 'tile-badges' },
     active ? h('span', { class: 'badge live' }, h('span', { class: 'dot' }), t('tile.active')) : null,
@@ -334,10 +323,6 @@ function renderTile(p, index) {
   const more = h('button', { type: 'button', class: 'icon-btn tile-menu', 'aria-label': t('tile.more'), 'aria-haspopup': 'menu' }, icon('dots'));
   more.addEventListener('click', (e) => { e.stopPropagation(); const r = more.getBoundingClientRect(); profileMenu(p, r.right - 210, r.bottom + 4, tile); });
   tile.addEventListener('contextmenu', (e) => { e.preventDefault(); profileMenu(p, e.clientX, e.clientY, tile); });
-  tile.addEventListener('mouseenter', () => setAmbient(profileHue(p)));
-  tile.addEventListener('mouseleave', () => setAmbient(restingHue()));
-  main.addEventListener('focus', () => setAmbient(profileHue(p)));
-  main.addEventListener('blur', () => setAmbient(restingHue()));
 
   tile.append(main, badges, more);
   return tile;
@@ -348,11 +333,10 @@ function renderGrid() {
   const grid = $('#grid');
   const list = visibleProfiles();
   grid.className = `grid${prefs.view === 'list' ? ' list' : ''}${firstRender ? ' intro' : ''}`;
-  const tiles = list.map(renderTile);
+  const tiles = list.map((p) => renderTile(p));
   if (!query.trim()) {
     const add = h('article', { class: 'tile add', role: 'listitem' },
       h('button', { type: 'button', class: 'tile-main', onclick: () => doSave() }, h('span', { class: 'plus' }, icon('plus')), h('span', {}, t('tile.add'))));
-    add.style.setProperty('--i', tiles.length);
     tiles.push(add);
   }
   grid.replaceChildren(...tiles);
@@ -386,7 +370,6 @@ function renderAll() {
   renderSession();
   renderGrid();
   renderEmpty();
-  setAmbient(restingHue());
 }
 
 /* ----------------------------------------------------------------- status */
@@ -400,7 +383,7 @@ async function refreshStatus() {
   session = res.data;
   if (!changed) return;
   renderSession();
-  if (activeChanged) { renderGrid(); setAmbient(restingHue()); }
+  if (activeChanged) renderGrid();
 }
 
 /* ----------------------------------------------------------------- actions */

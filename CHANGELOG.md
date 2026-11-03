@@ -8,6 +8,8 @@
 - The status banner shows the display name of an account that is not saved yet.
 - **Data folder moved** to `%LOCALAPPDATA%\EpicAccountManager` (profiles, backups and the WebView2 cache are all there now). Data from the old `%USERPROFILE%\EpicAccountManager` is copied over automatically the first time the new folder has no `accounts.json`.
 
+- **Calmer look.** Neutral graphite theme with a single accent; the coloured gradient tiles and background glow are gone. Accounts are neutral unless you pick a colour in *Edit profile*. The list view is the default (the grid is still one click away).
+
 ### Removed
 - The `setLock` command and the `password` argument of `save` / `switch`.
 

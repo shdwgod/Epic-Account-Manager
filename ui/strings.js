@@ -44,7 +44,7 @@ const STRINGS = {
     'switch.done': 'Switched to “{name}”', 'switch.launchNow': 'Launch Epic',
 
     'edit.title': 'Edit profile', 'edit.picture': 'Picture', 'edit.choose': 'Choose picture…', 'edit.remove': 'Remove picture',
-    'edit.color': 'Colour', 'edit.auto': 'Automatic', 'edit.confirm': 'Save changes', 'edit.done': 'Profile updated',
+    'edit.color': 'Colour', 'edit.auto': 'None', 'edit.confirm': 'Save changes', 'edit.done': 'Profile updated',
     'delete.title': 'Delete profile', 'delete.text': 'Delete “{name}”? This cannot be undone.', 'delete.done': 'Deleted “{name}”',
     'pin.on': '“{name}” pinned', 'pin.off': '“{name}” unpinned',
 
@@ -55,7 +55,6 @@ const STRINGS = {
     'settings.keys': 'Shortcuts: Ctrl+F search, Ctrl+N save account, Ctrl+, settings, arrow keys move between accounts.',
 
     'rel.now': 'just now',
-    'tile.switchHint': 'Switch',
     'edit.imageError': 'Could not read this image.',
     'app.apiMissing': 'This window must run inside Epic Account Manager.',
     'app.fatal': 'Something went wrong: {msg}',
