@@ -65,7 +65,8 @@ pub struct Opened {
     pub legacy: bool,
 }
 
-/// What the Windows Credential Manager entry holds.
+/// What the Windows Credential Manager entry holds. Its UserName field is a credential label,
+/// not the identity of the Epic account.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub username: String,
