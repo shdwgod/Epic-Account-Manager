@@ -205,6 +205,19 @@ fn same_display_name_on_another_account_gets_a_suffix() {
 }
 
 #[test]
+fn refreshing_a_profile_for_a_different_epic_account_is_rejected() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("alice@x", Some("Alice"), "a1a1", "A");
+    ok(save(&app));
+    fake.sign_in("bob@x", Some("Bob"), "b2b2", "B");
+
+    let message = err(save_as(&app, "Alice"));
+    assert!(message.contains("different Epic account"), "{message}");
+    assert_eq!(profile(&ok(app.call("state", &json!({}))), "Alice")["username"], json!("alice@x"));
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
+}
+
+#[test]
 fn resaving_keeps_a_name_the_user_chose() {
     let (_d, fake, app) = setup();
     fake.sign_in("alice@x", Some("Alice"), "a1a1", "A");
