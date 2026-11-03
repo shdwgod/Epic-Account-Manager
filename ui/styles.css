@@ -191,9 +191,6 @@ main::-webkit-scrollbar-thumb { background: var(--ink-3); border-radius: 10px; b
 }
 .dialog h2 { font-family: var(--display); font-size: 21px; font-weight: 600; margin-bottom: 12px; }
 .hint { color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
-.note { padding: 10px 12px; border-radius: 11px; margin-bottom: 14px; line-height: 1.45; background: var(--ink-3); color: var(--text); font-size: 13px; }
-.note.warn { background: rgba(242, 180, 90, .14); color: var(--amber); }
-.note.bad { background: rgba(255, 107, 120, .14); color: var(--red); }
 .field { margin-bottom: 14px; }
 .field > label, .label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 .input-wrap { position: relative; display: flex; align-items: center; }
@@ -202,23 +199,9 @@ main::-webkit-scrollbar-thumb { background: var(--ink-3); border-radius: 10px; b
   transition: border-color .15s, box-shadow .15s;
 }
 .input-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px hsl(var(--ah) 85% 68% / .2); }
-.input-wrap .eye { position: absolute; right: 4px; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); }
-.input-wrap .eye:hover { color: var(--text); background: var(--ink-3); }
 .ro { display: flex; align-items: center; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meter { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--muted); }
-.meter i { flex: 1; height: 4px; border-radius: 4px; background: var(--ink-3); transition: background .2s; }
-.meter span { margin-left: 8px; min-width: 52px; }
-.meter[data-s="1"] i:nth-child(-n+1) { background: var(--red); }
-.meter[data-s="2"] i:nth-child(-n+2) { background: var(--amber); }
-.meter[data-s="3"] i:nth-child(-n+3) { background: var(--green); }
-.meter[data-s="4"] i:nth-child(-n+4) { background: var(--green); }
 .form-error { color: var(--red); min-height: 18px; font-size: 13px; margin-bottom: 8px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-.seg { display: flex; padding: 3px; border-radius: 11px; background: var(--ink-0); border: 1px solid var(--line); }
-.seg button { flex: 1; padding: 8px; border-radius: 8px; color: var(--muted); font-weight: 600; }
-.seg button[aria-pressed="true"] { background: var(--ink-3); color: var(--text); }
-.seg button:disabled { opacity: .4; cursor: not-allowed; }
-.sub-hint { font-size: 12.5px; color: var(--muted); margin-top: 7px; }
 
 .edit-top { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
 .edit-top .avatar { width: 92px; height: 92px; border-radius: 22px; font-size: 40px; }

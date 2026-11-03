@@ -74,7 +74,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let db = Store::new(d.path().to_path_buf()).load().unwrap();
         assert!(db.accounts.is_empty());
-        assert!(db.settings.launch_after_switch && db.settings.require_password);
+        assert!(db.settings.launch_after_switch);
     }
 
     #[test]
@@ -96,14 +96,14 @@ mod tests {
             d.path().join("accounts.json"),
             r#"{
     "accounts": { "Alt": { "v": 3, "username": "x", "token_encrypted": "00", "saved": "2026-10-01 09:00", "last_used": null } },
-    "settings": { "launch_after_switch": false, "epic_path": "", "active_profile": "Alt" }
+    "settings": { "launch_after_switch": false, "epic_path": "", "require_password": true, "active_profile": "Alt" }
 }"#,
         )
         .unwrap();
         let db = Store::new(d.path().to_path_buf()).load().unwrap();
         assert_eq!(db.accounts["Alt"].v, 3);
         assert!(!db.settings.launch_after_switch);
-        assert!(db.settings.require_password, "missing key defaults to true");
+        // `require_password` was removed; files that still contain it keep loading.
         assert_eq!(db.settings.active_profile.as_deref(), Some("Alt"));
     }
 

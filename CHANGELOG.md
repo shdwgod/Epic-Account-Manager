@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **No more passwords.** Profiles are protected by Windows DPAPI only; the password option, strength meter and the "Require a password" setting are gone. Profiles saved with a password by an older version can no longer be opened: sign in to the account and use *Update saved session* once.
+- **Saving is one click.** The save dialog is gone; a new profile is named after the account's Epic display name, read from the Launcher's `auth.json` (`prod.account_info.display_name`). A duplicate name gets a ` (2)` suffix, and without `auth.json` the account id is used. Re-saving the same account refreshes its existing profile and keeps a name you chose.
+- The status banner shows the display name of an account that is not saved yet.
+- **Data folder moved** to `%LOCALAPPDATA%\EpicAccountManager` (profiles, backups and the WebView2 cache are all there now). Data from the old `%USERPROFILE%\EpicAccountManager` is copied over automatically the first time the new folder has no `accounts.json`.
+
+### Removed
+- The `setLock` command and the `password` argument of `save` / `switch`.
+
 ## 2.1.0
 
 ### UI

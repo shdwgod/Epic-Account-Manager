@@ -6,10 +6,13 @@ use crate::model::Opened;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::collections::BTreeMap;
 use std::fs;
+use serde_json::Value;
 use std::path::{Component, Path, PathBuf};
 
 const SNAPSHOT_DIRS: &[&str] = &["auth"];
 const CLEAR_ITEMS: &[&str] = &["auth", "EBWebView"];
+/// Where the Launcher keeps the signed-in account's details, next to the DPAPI access token.
+const AUTH_JSON: &[&str] = &["auth/auth.json", "auth.json"];
 const SNAPSHOT_MAX: usize = 8 * 1024 * 1024;
 const KEEP_BACKUPS: usize = 3;
 
@@ -91,7 +94,24 @@ pub fn restore(epic_data: &Path, files: &BTreeMap<String, String>) -> Result<()>
     Ok(())
 }
 
-fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+/// The signed-in account's display name from the Launcher's `auth.json`
+/// (`{ "prod": { "account_info": { "display_name": "..." } } }`).
+pub fn read_display_name(epic_data: &Path) -> Option<String> {
+    AUTH_JSON.iter().find_map(|rel| display_name_from_json(&fs::read_to_string(epic_data.join(rel)).ok()?))
+}
+
+fn display_name_from_json(text: &str) -> Option<String> {
+    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
+    let root = root.as_object()?;
+    let pick = |env: &Value| -> Option<String> {
+        let name = env.get("account_info")?.get("display_name")?.as_str()?.trim();
+        (!name.is_empty()).then(|| name.chars().take(64).collect())
+    };
+    root.get("prod").and_then(pick).or_else(|| root.values().find_map(pick))
+}
+
+/// Recursive copy (existing files are overwritten).
+pub fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -151,6 +171,32 @@ mod tests {
     fn write(p: &Path, content: &str) {
         fs::create_dir_all(p.parent().unwrap()).unwrap();
         fs::write(p, content).unwrap();
+    }
+
+    #[test]
+    fn display_name_is_read_from_auth_json() {
+        let epic = tempfile::tempdir().unwrap();
+        assert_eq!(read_display_name(epic.path()), None, "no file");
+
+        write(&epic.path().join("auth/auth.json"), r#"{ "prod": { "account_info": { "email": "x", "display_name": "  shdwlol ", "country": "PL" } } }"#);
+        assert_eq!(read_display_name(epic.path()).as_deref(), Some("shdwlol"));
+
+        // BOM, other environment names and the file next to the auth folder also work.
+        let other = tempfile::tempdir().unwrap();
+        write(&other.path().join("auth.json"), "\u{feff}{ \"gamedev\": { \"account_info\": { \"display_name\": \"Dev\" } } }");
+        assert_eq!(read_display_name(other.path()).as_deref(), Some("Dev"));
+    }
+
+    #[test]
+    fn display_name_ignores_unusable_files() {
+        assert_eq!(display_name_from_json("not json"), None);
+        assert_eq!(display_name_from_json("[]"), None);
+        assert_eq!(display_name_from_json(r#"{ "prod": { "account_info": { "display_name": "   " } } }"#), None);
+        assert_eq!(display_name_from_json(r#"{ "prod": { "account_info": {} } }"#), None);
+        assert_eq!(display_name_from_json(r#"{ "prod": { "account_info": { "display_name": 5 } } }"#), None);
+        let long = "a".repeat(200);
+        let json = format!(r#"{{ "prod": {{ "account_info": {{ "display_name": "{long}" }} }} }}"#);
+        assert_eq!(display_name_from_json(&json).unwrap().len(), 64);
     }
 
     #[test]

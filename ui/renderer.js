@@ -27,11 +27,7 @@ const ICONS = {
   swap: SVG('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>'),
   pencil: SVG('<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>'),
   trash: SVG('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
-  eye: SVG('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
-  eyeOff: SVG('<path d="M9.9 4.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/>'),
   shield: SVG('<path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>'),
-  lock: SVG('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
-  unlock: SVG('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
   check: SVG('<path d="M20 6 9 17l-5-5"/>'),
   alert: SVG('<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>'),
   search: SVG('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
@@ -206,42 +202,6 @@ function textField(label, { value = '', placeholder = '', readonly = false } = {
   const input = h('input', { type: 'text', value, placeholder, autocomplete: 'off', spellcheck: 'false', readonly });
   return { input, el: h('div', { class: 'field' }, h('label', {}, label), h('div', { class: 'input-wrap' }, input)) };
 }
-function passwordField(label, { onInput } = {}) {
-  const input = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false' });
-  const eye = h('button', { type: 'button', class: 'eye', tabindex: '-1', 'aria-label': t('common.showHide') }, icon('eye'));
-  eye.addEventListener('click', () => {
-    const show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    eye.replaceChildren(icon(show ? 'eyeOff' : 'eye'));
-  });
-  if (onInput) input.addEventListener('input', onInput);
-  return { input, el: h('div', { class: 'field' }, h('label', {}, label), h('div', { class: 'input-wrap' }, input, eye)) };
-}
-function strength(pw) {
-  if (!pw) return 0;
-  let s = 0;
-  if (pw.length >= 4) s++;
-  if (pw.length >= 8) s++;
-  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
-  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) s++;
-  return Math.min(4, Math.max(1, s));
-}
-function meter() {
-  const label = h('span', {});
-  const el = h('div', { class: 'meter', 'data-s': '0' }, h('i'), h('i'), h('i'), h('i'), label);
-  return { el, update(pw) { const s = strength(pw); el.dataset.s = s; label.textContent = s ? t(s <= 1 ? 'pw.weak' : s <= 2 ? 'pw.ok' : 'pw.strong') : ''; } };
-}
-function segmented(options, value, onChange) {
-  const wrap = h('div', { class: 'seg', role: 'group' });
-  const btns = options.map((o) => {
-    const b = h('button', { type: 'button', 'aria-pressed': String(o.value === value), disabled: !!o.disabled, title: o.title || '' }, o.label);
-    b.addEventListener('click', () => { value = o.value; btns.forEach((x, i) => x.setAttribute('aria-pressed', String(options[i].value === value))); onChange(value); });
-    return b;
-  });
-  wrap.append(...btns);
-  return wrap;
-}
-
 /* -------------------------------------------------------------------- menu */
 function closeMenu() {
   $('#menuRoot').replaceChildren();
@@ -278,9 +238,6 @@ function profileMenu(p, x, y, tile) {
     { icon: 'pencil', label: t('menu.edit'), run: () => doEdit(p) },
     { icon: 'pin', label: t(p.pinned ? 'menu.unpin' : 'menu.pin'), run: () => doPin(p) },
     { icon: 'refresh', label: t('menu.refresh'), run: () => doRefresh(p) },
-    p.locked
-      ? { icon: 'unlock', label: t('menu.removeLock'), run: () => doRemoveLock(p) }
-      : { icon: 'lock', label: t('menu.addLock'), run: () => doAddLock(p) },
     'sep',
     { icon: 'trash', label: t('common.delete'), danger: true, run: () => doDelete(p) },
   ], x, y, tile);
@@ -332,7 +289,7 @@ function renderSession() {
   } else if (session.username) {
     face = h('div', { class: 'avatar' }, '?'); face.style.setProperty('--h', 40);
     title = t('session.unsaved');
-    sub = [h('span', {}, t('session.unsavedSub', { id: shortId(session.username) })), ...chips];
+    sub = [h('span', {}, t('session.unsavedSub', { id: session.displayName || shortId(session.username) })), ...chips];
     actions = [launch, h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('session.saveThis'))];
   } else {
     face = h('div', { class: 'avatar' }, '–'); face.style.setProperty('--h', 222);
@@ -371,7 +328,7 @@ function renderTile(p, index) {
 
   const badges = h('div', { class: 'tile-badges' },
     active ? h('span', { class: 'badge live' }, h('span', { class: 'dot' }), t('tile.active')) : null,
-    h('span', { class: `badge${p.locked ? '' : ' open'}`, title: t(p.locked ? 'tile.locked' : 'tile.open') }, icon(p.locked ? 'lock' : 'unlock')),
+    p.legacy ? h('span', { class: 'badge open', title: t('tile.legacy') }, icon('alert')) : null,
     p.pinned ? h('span', { class: 'badge', title: t('tile.pinned') }, icon('pin')) : null);
 
   const more = h('button', { type: 'button', class: 'icon-btn tile-menu', 'aria-label': t('tile.more'), 'aria-haspopup': 'menu' }, icon('dots'));
@@ -452,71 +409,19 @@ async function doLaunch() {
   if (data) setTimeout(refreshStatus, 1500);
 }
 
+/* Saving needs no dialog: the profile is named after the Epic display name, and
+   `existing` refreshes a profile that is already saved. */
 async function doSave(existing = null) {
-  if (busy || openDialogCtl) return;
-  const cur = session?.username || null;
-  const matched = existing || (cur && state.profiles.find((p) => p.username === cur)) || null;
-  const mustHavePw = state.settings.requirePassword !== false;
-  let mode = mustHavePw || matched?.locked ? 'pw' : 'none';
-
-  const name = textField(t('save.name'), { value: matched?.name || '', placeholder: t('save.namePh'), readonly: !!existing });
-  const info = h('div');
-  const m = meter();
-  const pw = passwordField(t('common.password'), { onInput: () => m.update(pw.input.value) });
-  const rep = passwordField(t('common.repeat'));
-  const pwBox = h('div', {}, pw.el, rep.el, m.el);
-  const modeHint = h('p', { class: 'sub-hint' });
-  const seg = segmented([
-    { value: 'pw', label: t('save.usePw') },
-    { value: 'none', label: t('save.noPw'), disabled: mustHavePw, title: mustHavePw ? t('save.pwRequired') : '' },
-  ], mode, (v) => { mode = v; syncMode(); });
-  const protection = h('div', { class: 'field' }, h('div', { class: 'label' }, t('save.protection')), seg, modeHint);
-
-  let dlg = null;
-  function syncMode() {
-    pwBox.hidden = mode !== 'pw';
-    modeHint.textContent = mustHavePw && mode === 'pw' ? t('save.pwRequired') : t(mode === 'pw' ? 'save.pwHint' : 'save.noPwHint');
-  }
-  function syncInfo() {
-    const nm = name.input.value.trim();
-    const ex = state.profiles.find((p) => p.name === nm);
-    const notes = [];
-    if (session && !cur) notes.push(h('div', { class: 'note warn' }, t('save.notSignedIn')));
-    else if (cur) notes.push(h('div', { class: 'note' }, t('save.signedIn', { id: shortId(cur) })));
-    const mismatch = !!(ex && cur && ex.username !== cur);
-    if (mismatch) notes.push(h('div', { class: 'note bad' }, t('save.mismatch', { name: ex.name })));
-    else if (ex) notes.push(h('div', { class: 'note' }, t('save.same', { name: ex.name })));
-    info.replaceChildren(...notes);
-    dlg?.setConfirm(mismatch ? t('save.confirmReplace') : t(ex ? 'save.confirmUpdate' : 'save.confirm'), mismatch);
-  }
-  name.input.addEventListener('input', syncInfo);
-  syncMode();
-
-  const pending = openDialog({
-    title: t(existing ? 'save.update' : 'save.title'),
-    children: [info, name.el, protection, pwBox],
-    confirm: t('save.confirm'),
-    onSubmit: async (ctl) => {
-      const nm = name.input.value.trim();
-      if (!nm) { ctl.error(t('name.enter')); name.input.focus(); return false; }
-      if (mode === 'pw') {
-        if (pw.input.value.length < 4) { ctl.error(t('pw.short')); pw.input.focus(); return false; }
-        if (pw.input.value !== rep.input.value) { ctl.error(t('pw.mismatch')); rep.input.focus(); return false; }
-      }
-      const existed = state.profiles.some((p) => p.name === nm);
-      setBusy(true, t('save.busy'));
-      const res = await rpc(window.api.save(nm, mode === 'pw' ? pw.input.value : ''));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); ctl.focus(); return false; }
-      applyState(res.data);
-      toast(t(existed ? 'save.updated' : 'save.done', { name: nm }));
-      refreshStatus();
-      return true;
-    },
-  });
-  dlg = openDialogCtl;
-  syncInfo();
-  await pending;
+  if (busy || openDialogCtl || !session) return;
+  if (!session.username) { toast(t('save.needSignIn'), 'err'); return; }
+  const target = existing || state.profiles.find((p) => p.username === session.username) || null;
+  setBusy(true, t('save.busy'));
+  const res = await rpc(window.api.save(target?.name));
+  setBusy(false);
+  if (!res.ok) { toast(res.error, 'err'); return; }
+  applyState(res.data);
+  toast(t(target ? 'save.updated' : 'save.done', { name: res.data.saved }));
+  refreshStatus();
 }
 
 function afterSwitch(p, data) {
@@ -530,26 +435,11 @@ function afterSwitch(p, data) {
 
 async function doSwitch(p) {
   if (busy || openDialogCtl) return;
-  const run = async (password, ctl) => {
-    setBusy(true, t('switch.busy', { name: p.name }), t('switch.busySub'), p);
-    const res = await rpc(window.api.switchTo(p.name, password));
-    setBusy(false);
-    if (!res.ok) {
-      if (ctl) { ctl.error(res.error); ctl.focus(); } else toast(res.error, 'err');
-      return false;
-    }
-    afterSwitch(p, res.data);
-    return true;
-  };
-  if (!p.locked) { await run(''); return; }
-  const pw = passwordField(t('common.password'));
-  await openDialog({
-    title: t('switch.title', { name: p.name }), hint: t('switch.hint'), children: [pw.el], confirm: t('switch.confirm'),
-    onSubmit: (ctl) => {
-      if (!pw.input.value) { ctl.error(t('pw.enter')); return false; }
-      return run(pw.input.value, ctl);
-    },
-  });
+  setBusy(true, t('switch.busy', { name: p.name }), t('switch.busySub'), p);
+  const res = await rpc(window.api.switchTo(p.name));
+  setBusy(false);
+  if (!res.ok) { toast(res.error, 'err'); return; }
+  afterSwitch(p, res.data);
 }
 
 async function doRefresh(p) {
@@ -638,45 +528,6 @@ async function doEdit(p) {
   });
 }
 
-async function doRemoveLock(p) {
-  if (busy || openDialogCtl) return;
-  const pw = passwordField(t('lock.current'));
-  await openDialog({
-    title: t('lock.removeTitle', { name: p.name }), hint: t('lock.removeHint'), children: [pw.el], confirm: t('lock.remove'),
-    onSubmit: async (ctl) => {
-      if (!pw.input.value) { ctl.error(t('pw.enter')); return false; }
-      setBusy(true, t('lock.busy'));
-      const res = await rpc(window.api.setLock(p.name, pw.input.value, null));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); ctl.focus(); return false; }
-      applyState(res.data);
-      toast(t('lock.removed', { name: p.name }));
-      return true;
-    },
-  });
-}
-
-async function doAddLock(p) {
-  if (busy || openDialogCtl) return;
-  const m = meter();
-  const pw = passwordField(t('common.password'), { onInput: () => m.update(pw.input.value) });
-  const rep = passwordField(t('common.repeat'));
-  await openDialog({
-    title: t('lock.addTitle', { name: p.name }), children: [pw.el, rep.el, m.el], confirm: t('lock.add'),
-    onSubmit: async (ctl) => {
-      if (pw.input.value.length < 4) { ctl.error(t('pw.short')); return false; }
-      if (pw.input.value !== rep.input.value) { ctl.error(t('pw.mismatch')); return false; }
-      setBusy(true, t('lock.busy'));
-      const res = await rpc(window.api.setLock(p.name, null, pw.input.value));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); return false; }
-      applyState(res.data);
-      toast(t('lock.added', { name: p.name }));
-      return true;
-    },
-  });
-}
-
 async function doDelete(p) {
   if (busy || openDialogCtl) return;
   await openDialog({
@@ -711,7 +562,7 @@ async function openSettings() {
 
   const toggle = (key, title, text) => {
     const input = h('input', { type: 'checkbox', role: 'switch' });
-    input.checked = key === 'requirePassword' ? state.settings[key] !== false : !!state.settings[key];
+    input.checked = !!state.settings[key];
     input.addEventListener('change', async () => {
       const data = await call(window.api.settings({ [key]: input.checked }));
       if (data) applyState(data); else input.checked = !input.checked;
@@ -727,7 +578,6 @@ async function openSettings() {
   await openDialog({
     title: t('settings.title'), confirm: t('common.done'), hideCancel: true,
     children: [
-      toggle('requirePassword', t('settings.requirePw'), t('settings.requirePwText')),
       toggle('launchAfterSwitch', t('settings.launch'), t('settings.launchText')),
       h('div', { class: 'block' }, h('div', { class: 'label' }, t('settings.path')), h('div', { class: 'path-row' }, pathBox, browse, autoBtn)),
       h('div', { class: 'block' }, h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.data'))),
