@@ -105,7 +105,7 @@ pub fn read_email(epic_data: &Path) -> Option<String> {
 }
 
 fn email_from_json(text: &str) -> Option<String> {
-    let root: Value = serde_json::from_str(text.trim_start_matches('\\u{feff}')).ok()?;
+    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
     let root = root.as_object()?;
     let pick = |env: &Value| -> Option<String> {
         let email = env.get("account_info")?.get("email")?.as_str()?.trim();
@@ -119,7 +119,7 @@ pub fn read_display_name(epic_data: &Path) -> Option<String> {
 }
 
 fn account_id_from_json(text: &str) -> Option<String> {
-    let root: Value = serde_json::from_str(text.trim_start_matches('\\u{feff}')).ok()?;
+    let root: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
     let root = root.as_object()?;
     let pick = |env: &Value| -> Option<String> {
         let id = env.get("account_info")?.get("account_id")?.as_str()?.trim();
