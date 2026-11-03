@@ -66,7 +66,7 @@ mod tests {
     use crate::model::Profile;
 
     fn profile() -> Profile {
-        Profile { v: 4, username: "u".into(), token_encrypted: "ab".into(), saved: Some("2026-01-01 10:00".into()), last_used: None, avatar: None }
+        Profile { v: 4, username: "u".into(), token_encrypted: "ab".into(), saved: Some("2026-01-01 10:00".into()), last_used: None, avatar: None, pinned: false, hue: None }
     }
 
     #[test]

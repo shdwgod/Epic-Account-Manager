@@ -8,7 +8,7 @@
 **Works only for new Preview Launcher**
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Electron](https://img.shields.io/badge/built%20with-Electron-47848F?logo=electron&logoColor=white)
+![Rust](https://img.shields.io/badge/built%20with-Rust%20%2B%20WebView2-DEA584?logo=rust&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 <br />
@@ -28,14 +28,17 @@
 ## ✨ Features
 
 - **One-click switching** between any number of saved Epic Games accounts
-- **Optional password protection** — protect each profile with its own password, or turn passwords off in Settings and switch with a single click
-- **Per-profile control** — add or remove the password of any profile later from its `⋯` menu, and see at a glance which profiles are protected (🔒) and which are not (🔓)
-- **Custom pictures** — pick an image from your computer for each account
-- **Clean dark UI** with profile cards, rename / delete, and toast notifications
-- **Auto-launch** the Epic Games Launcher after switching (optional)
+- **Live status bar** — see which saved account the Launcher is signed in to, whether it is running, launch it from the app, or save an account it doesn't know yet
+- **Profile picker UI** — big profile tiles (or a compact list), search, sorting, pinning, per-profile colours and pictures; the background glow follows the active / hovered account
+- **Optional password protection** — protect each profile with its own password (with a strength meter), or turn passwords off in Settings and switch with a single click
+- **Smart saving** — re-saving the account you are signed in to updates its existing profile, and you get a clear warning before a profile would be replaced by a different account
+- **Wrong password? Retry in place** — errors appear inside the dialog instead of closing it
+- **English and Polish** — follows the system language, switchable in Settings
+- **Keyboard friendly** — `Ctrl+F` search, `Ctrl+N` save account, `Ctrl+,` settings, arrow keys move between tiles, right-click opens the profile menu
+- **Auto-launch** the Epic Games Launcher after switching (optional); if it cannot be started the switch still counts and you get a warning
 - **Safe by design** — runs fully offline, nothing is sent anywhere
 - **Automatic backups** — the Launcher's previous session data is moved to a backup folder, never deleted outright
-- **Portable** — build a single `.exe` that needs no installation
+- **Portable** — a single small `.exe`, no installer, no Node.js, no Electron
 
 ## 🧠 How it works
 
@@ -52,37 +55,33 @@ Profiles are encrypted either with your password (protected profiles) or with Wi
 
 ### Download
 
-The easiest way: **[download the portable `.exe` (v1.0.0)](https://github.com/shdwgod/Epic-Account-Manager/releases/download/v1.0.0/Epic.Account.Manager.1.0.0.exe)**, run it, and you're done — no installation and no Node.js needed. All versions are listed on the [Releases page](https://github.com/shdwgod/Epic-Account-Manager/releases).
+Grab the portable `.exe` from the [Releases page](https://github.com/shdwgod/Epic-Account-Manager/releases) (or from the CI artifacts of this repository), run it, and you're done. Needs the Microsoft Edge WebView2 runtime, which is built into Windows 11 and most Windows 10 installs.
 
-### Requirements
+### Build from source
 
-- Windows 10 / 11
-- Epic Games Launcher installed
-- [Node.js](https://nodejs.org) (LTS) — only needed to run from source or build the `.exe` yourself
-
-### Run from source
+Requirements: Windows 10 / 11, Epic Games Launcher, [Rust](https://rustup.rs) (stable, MSVC toolchain).
 
 ```bash
-git clone https://github.com/shdwgod/Epic-Account-Manager.git
-cd Epic-Account-Manager
-npm install
-npm start
+cargo run --release     # run
+cargo build --release   # -> target/release/*.exe
+cargo test              # core logic tests
 ```
 
-### Build a portable `.exe`
+### Working on the UI without Windows
+
+The UI is plain HTML/CSS/JS in `ui/` and is embedded into the exe at build time. To iterate on it in a normal browser with a fake backend:
 
 ```bash
-npm run dist
+node ui-dev/serve.mjs     # http://localhost:5173
+# options: ?empty  ?signedout  ?unsaved  ?lang=pl
 ```
-
-The executable is created in the `dist` folder.
 
 ## 📖 Usage
 
 1. Sign in to the Epic Games Launcher with the first account (tick **Remember me**).
 2. In the app click **Save current account**, give it a name and — if passwords are enabled — set a password.
 3. Sign out in the Launcher, sign in to your next account and save it the same way.
-4. From now on just press **Switch to this account** on the profile card. Protected profiles ask for their password, password-free profiles switch immediately.
+4. From now on just click a profile tile. Protected profiles ask for their password, password-free profiles switch immediately.
 
 ### Switching without a password
 
@@ -94,8 +93,8 @@ You can mix both modes: turn the setting back on, or use `⋯` → **Set passwor
 
 **Tips**
 
-- Click an avatar (or use the `⋯` menu → *Change picture*) to set a custom image.
-- Use the `⋯` menu to rename, delete, or set/remove the password of a profile.
+- Right-click a tile (or use its `⋯` menu) → *Edit profile* to rename it and change its picture or colour; there you can also pin it, refresh its saved session, set / remove its password or delete it.
+- Pinned profiles always stay at the top.
 - Open **Settings** to enable/disable the password requirement and auto-launch, set the Launcher path manually, or open the data folder.
 
 ## 🗂 Where data is stored
@@ -110,7 +109,7 @@ You can mix both modes: turn the setting back on, or use `⋯` → **Set passwor
 - **Protected profiles:** encrypted with a key derived from **your password** using `scrypt`, authenticated with HMAC-SHA256, and additionally wrapped with **Windows DPAPI**, so they can only be opened by your Windows user account.
 - **Password-free profiles:** protected by **Windows DPAPI only**. They cannot be read on another PC or by another Windows user, but anyone using your unlocked Windows account can switch to them without a password. Use this mode only on a PC you trust.
 - The app never talks to the network and has no telemetry.
-- The Electron window runs with `contextIsolation` and `sandbox` enabled and a strict Content-Security-Policy.
+- The UI runs in a WebView2 window with a strict Content-Security-Policy (no inline scripts or styles, no remote content).
 - Anyone with access to your unlocked Windows session *and* the profile password (or, for password-free profiles, just the session) could use a saved session, so choose strong passwords for accounts you care about.
 
 ## 🛠 Troubleshooting
@@ -122,20 +121,26 @@ You can mix both modes: turn the setting back on, or use `⋯` → **Set passwor
 | "A password is required" when saving | **Require a password** is turned on in Settings. Turn it off to save profiles without a password. |
 | "Could not reset: EBWebView" | The folder was in use. Close any leftover Epic processes and try again. |
 | Launcher not found | Open **Settings → Browse** and select `EpicGamesLauncher.exe`. |
-| `Cannot create symbolic link` during `npm run dist` | Enable **Developer Mode** in Windows settings (or run the terminal as administrator), delete `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign` and build again. |
 | Windows SmartScreen warns about the `.exe` | The build is not code-signed. Click **More info → Run anyway**. |
 
 ## 📁 Project structure
 
 ```
-├── main.js        # Electron main process: Windows APIs, encryption, profile logic
-├── preload.js     # Secure bridge between UI and main process
-├── index.html     # App shell
-├── renderer.js    # UI logic
-├── styles.css     # Styling
-├── icon.ico       # Window / taskbar / executable icon
-├── docs/          # Logo and screenshot used in this README
-└── package.json
+├── src/
+│   ├── app.rs        # Commands the UI calls (save, switch, setMeta, ...)
+│   ├── store.rs      # accounts.json, atomic writes, backups
+│   ├── crypto.rs     # scrypt + HMAC + DPAPI profile encryption
+│   ├── snapshot.rs   # Launcher session snapshot / restore
+│   ├── shell.rs      # Window, WebView2, IPC bridge (Windows)
+│   └── winplat.rs    # Windows APIs: Credential Manager, processes (Windows)
+├── ui/
+│   ├── index.html    # App shell
+│   ├── styles.css    # Styling
+│   ├── i18n.js       # English / Polish strings
+│   └── renderer.js   # UI logic
+├── ui-dev/           # Browser preview with a fake backend
+├── tests/            # Integration tests of the core logic
+└── docs/             # Logo and screenshot used in this README
 ```
 
 ## ⚠️ Disclaimer

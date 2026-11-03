@@ -1,6 +1,6 @@
 [package]
 name = "epic-account-manager"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 description = "Epic Account Manager - switch between Epic Games accounts in one click (Rust + WebView2)"
 license = "MIT"

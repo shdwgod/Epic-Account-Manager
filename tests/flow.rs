@@ -345,3 +345,69 @@ fn unknown_command_is_an_error_not_a_panic() {
     let (_d, _fake, app) = setup();
     assert!(err(app.call("format-c-drive", &json!({}))).starts_with("Unexpected error:"));
 }
+
+#[test]
+fn pin_and_colour_are_stored_validated_and_survive_edits() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("alice@x", "a1a1", "A");
+    let st = ok(save(&app, "Alice", "pw12"));
+    assert_eq!(profile(&st, "Alice")["pinned"], json!(false));
+    assert_eq!(profile(&st, "Alice")["hue"], Value::Null);
+    assert!(st["version"].is_string(), "the UI shows the app version");
+
+    let st = ok(app.call("setMeta", &json!({ "name": "Alice", "pinned": true, "hue": 215 })));
+    assert_eq!(profile(&st, "Alice")["pinned"], json!(true));
+    assert_eq!(profile(&st, "Alice")["hue"], json!(215));
+
+    // Fields that are not sent stay as they are.
+    let st = ok(app.call("setMeta", &json!({ "name": "Alice", "hue": 40 })));
+    assert_eq!(profile(&st, "Alice")["pinned"], json!(true));
+    assert_eq!(profile(&st, "Alice")["hue"], json!(40));
+
+    // Renaming and re-saving keep the customisation.
+    ok(app.call("rename", &json!({ "oldName": "Alice", "newName": "Main" })));
+    ok(save(&app, "Main", "pw12"));
+    let st = ok(app.call("state", &json!({})));
+    assert_eq!(profile(&st, "Main")["pinned"], json!(true));
+    assert_eq!(profile(&st, "Main")["hue"], json!(40));
+
+    // `null` goes back to the automatic colour; bad input is rejected.
+    let st = ok(app.call("setMeta", &json!({ "name": "Main", "hue": null, "pinned": false })));
+    assert_eq!(profile(&st, "Main")["hue"], Value::Null);
+    assert_eq!(profile(&st, "Main")["pinned"], json!(false));
+    for bad in [json!(360), json!(-5), json!("red"), json!(12.5)] {
+        assert_eq!(err(app.call("setMeta", &json!({ "name": "Main", "hue": bad }))), "Invalid color.");
+    }
+    assert_eq!(err(app.call("setMeta", &json!({ "name": "Nobody", "pinned": true }))), "Profile does not exist.");
+}
+
+#[test]
+fn resaving_keeps_last_used_time() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("alice@x", "a1a1", "A");
+    ok(save(&app, "Alice", "pw12"));
+    let st = ok(switch(&app, "Alice", "pw12"));
+    let used = profile(&st, "Alice")["lastUsed"].clone();
+    assert!(used.is_string());
+    let st = ok(save(&app, "Alice", "pw12"));
+    assert_eq!(profile(&st, "Alice")["lastUsed"], used, "refreshing the session must not erase the history");
+}
+
+#[test]
+fn switch_still_succeeds_when_the_launcher_cannot_be_started() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Fake::new(dir.path(), false); // no EpicGamesLauncher.exe anywhere
+    let app = App::new(fake.clone());
+    fake.sign_in("alice@x", "a1a1", "SESSION-ALICE");
+    ok(save(&app, "Alice", "pw12"));
+    fake.sign_in("bob@x", "b2b2", "SESSION-BOB");
+
+    let st = ok(switch(&app, "Alice", "pw12"));
+    assert_eq!(fake.session(), "SESSION-ALICE", "the session was switched");
+    assert_eq!(fake.read_token().unwrap().username, "alice@x");
+    assert_eq!(st["warnings"], json!(["Epic Games Launcher not found. Set its path in Settings."]));
+    assert!(st["warning"].as_str().unwrap().contains("not found"));
+    assert!(profile(&st, "Alice")["lastUsed"].is_string(), "the switch is recorded");
+    let status = ok(app.call("status", &json!({})));
+    assert_eq!(status["activeProfile"], json!("Alice"));
+}

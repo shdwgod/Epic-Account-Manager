@@ -20,6 +20,12 @@ pub struct Profile {
     pub last_used: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar: Option<String>,
+    /// Pinned profiles are listed first.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pinned: bool,
+    /// Accent colour (hue, 0-359) chosen by the user; `None` = derived from the name by the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hue: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -29,9 +29,14 @@ const HOST: &str = "app.localhost";
 const ORIGIN: &str = "http://app.localhost";
 const SINGLE_INSTANCE_MUTEX: &str = "Local\\EpicAccountManager.SingleInstance";
 
-const INDEX_HTML: &str = include_str!("../ui/index.html");
-const STYLES_CSS: &str = include_str!("../ui/styles.css");
-const RENDERER_JS: &str = include_str!("../ui/renderer.js");
+/// Everything the UI is made of; embedded in the exe and served from `http://app.localhost/`.
+const ASSETS: &[(&str, &str, &str)] = &[
+    ("/", "text/html; charset=utf-8", include_str!("../ui/index.html")),
+    ("/index.html", "text/html; charset=utf-8", include_str!("../ui/index.html")),
+    ("/styles.css", "text/css; charset=utf-8", include_str!("../ui/styles.css")),
+    ("/i18n.js", "text/javascript; charset=utf-8", include_str!("../ui/i18n.js")),
+    ("/renderer.js", "text/javascript; charset=utf-8", include_str!("../ui/renderer.js")),
+];
 
 /// Replaces the old Electron `preload.js`: same `window.api` surface, backed by wry IPC.
 const BRIDGE_JS: &str = r#"
@@ -60,6 +65,7 @@ const BRIDGE_JS: &str = r#"
     launch: () => call('launch'),
     pickImage: () => call('pickImage'),
     setAvatar: (name, avatar) => call('setAvatar', { name, avatar }),
+    setMeta: (name, meta) => call('setMeta', { name, ...meta }),
     openDataFolder: () => call('openDataFolder'),
   });
 })();
@@ -89,17 +95,13 @@ impl HasDisplayHandle for Parent {
 }
 
 fn serve(req: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
-    let (mime, body): (&str, &'static str) = match req.uri().path() {
-        "/" | "/index.html" => ("text/html; charset=utf-8", INDEX_HTML),
-        "/styles.css" => ("text/css; charset=utf-8", STYLES_CSS),
-        "/renderer.js" => ("text/javascript; charset=utf-8", RENDERER_JS),
-        _ => {
-            return Response::builder()
-                .status(404)
-                .header(CONTENT_TYPE, "text/plain")
-                .body(Cow::Borrowed(&b"Not found"[..]))
-                .expect("static response");
-        }
+    let path = req.uri().path();
+    let Some(&(_, mime, body)) = ASSETS.iter().find(|(p, _, _)| *p == path) else {
+        return Response::builder()
+            .status(404)
+            .header(CONTENT_TYPE, "text/plain")
+            .body(Cow::Borrowed(&b"Not found"[..]))
+            .expect("static response");
     };
     Response::builder()
         .status(200)
@@ -166,7 +168,7 @@ fn try_run() -> Result<(), String> {
 
     let window = WindowBuilder::new()
         .with_title(TITLE)
-        .with_inner_size(LogicalSize::new(1000.0, 700.0))
+        .with_inner_size(LogicalSize::new(1040.0, 720.0))
         .with_min_inner_size(LogicalSize::new(820.0, 560.0))
         .with_visible(false) // shown once the page has loaded, so there is no white flash
         .with_theme(Some(tao::window::Theme::Dark))
@@ -188,7 +190,7 @@ fn try_run() -> Result<(), String> {
     let load_proxy = proxy.clone();
 
     let webview = WebViewBuilder::new_with_web_context(&mut context)
-        .with_background_color((14, 15, 20, 255))
+        .with_background_color((20, 21, 24, 255))
         .with_initialization_script(BRIDGE_JS)
         .with_custom_protocol("app".into(), |_id, req| serve(req))
         .with_url(format!("{ORIGIN}/"))

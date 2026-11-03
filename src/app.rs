@@ -1,4 +1,4 @@
-//! Application commands - a 1:1 port of the IPC handlers in the old `main.js`.
+//! Application commands (the IPC handlers the UI talks to through `window.api`).
 //! Every command returns `{ "ok": true, "data": ... }` or `{ "ok": false, "error": "..." }`.
 
 use crate::crypto;
@@ -88,6 +88,7 @@ impl App {
             "remove" => self.remove(arg),
             "settings" => self.settings(arg),
             "setAvatar" => self.set_avatar(arg),
+            "setMeta" => self.set_meta(arg),
             "launch" => {
                 self.start_epic(&self.store.load()?)?;
                 Ok(json!(true))
@@ -132,10 +133,13 @@ impl App {
                     "lastUsed": p.last_used,
                     "avatar": p.avatar,
                     "locked": p.v != 4,
+                    "pinned": p.pinned,
+                    "hue": p.hue,
                 })
             })
             .collect();
         json!({
+            "version": env!("CARGO_PKG_VERSION"),
             "profiles": profiles,
             "settings": {
                 "requirePassword": db.settings.require_password,
@@ -205,7 +209,8 @@ impl App {
         let token_encrypted =
             if use_password { crypto::encrypt_token(p, &snapshot, password)? } else { crypto::encrypt_open(p, &snapshot)? };
 
-        let avatar = db.accounts.get(&name).and_then(|x| x.avatar.clone());
+        // Re-saving a profile refreshes its session but keeps everything the user customised.
+        let previous = db.accounts.get(&name).cloned();
         db.accounts.insert(
             name.clone(),
             Profile {
@@ -213,8 +218,10 @@ impl App {
                 username: cur.username,
                 token_encrypted,
                 saved: Some(now_str()),
-                last_used: None,
-                avatar,
+                last_used: previous.as_ref().and_then(|x| x.last_used.clone()),
+                avatar: previous.as_ref().and_then(|x| x.avatar.clone()),
+                pinned: previous.as_ref().is_some_and(|x| x.pinned),
+                hue: previous.as_ref().and_then(|x| x.hue),
             },
         );
         db.settings.active_profile = Some(name);
@@ -258,9 +265,10 @@ impl App {
         }
         db.settings.active_profile = Some(name);
         self.store.save(&db)?;
-        if db.settings.launch_after_switch {
-            self.start_epic(&db)?;
-        }
+
+        // The session is already switched at this point, so a launcher that cannot be
+        // started is reported as a warning, not as a failed switch.
+        let launch_error = if db.settings.launch_after_switch { self.start_epic(&db).err() } else { None };
 
         let mut state = self.public_state(&db);
         let mut notes = Vec::new();
@@ -270,8 +278,13 @@ impl App {
         if snapshot_files.is_none() {
             notes.push("This profile has no session snapshot - log in to that account, then re-save it.".to_string());
         }
+        if let Some(e) = launch_error {
+            notes.push(e.message());
+        }
         if !notes.is_empty() {
+            // `warning` is the joined text; `warnings` lets the UI translate each note on its own.
             state["warning"] = Value::String(notes.join(" "));
+            state["warnings"] = json!(notes);
         }
         Ok(state)
     }
@@ -366,6 +379,26 @@ impl App {
             None | Some(Value::Null) => entry.avatar = None,
             Some(Value::String(s)) if valid_avatar(s) => entry.avatar = Some(s.clone()),
             _ => return Err(Error::app("Invalid image.")),
+        }
+        self.store.save(&db)?;
+        Ok(self.public_state(&db))
+    }
+
+    /// Pin / colour of a profile. Both fields are optional; `"hue": null` goes back to the automatic colour.
+    fn set_meta(&self, arg: &Value) -> Result<Value> {
+        let name = arg_str(arg, "name");
+        let mut db = self.store.load()?;
+        let entry = db.accounts.get_mut(name).ok_or_else(|| Error::app("Profile does not exist."))?;
+        if let Some(pinned) = arg.get("pinned").and_then(Value::as_bool) {
+            entry.pinned = pinned;
+        }
+        match arg.get("hue") {
+            None => {}
+            Some(Value::Null) => entry.hue = None,
+            Some(v) => match v.as_u64() {
+                Some(h) if h < 360 => entry.hue = Some(h as u16),
+                _ => return Err(Error::app("Invalid color.")),
+            },
         }
         self.store.save(&db)?;
         Ok(self.public_state(&db))
