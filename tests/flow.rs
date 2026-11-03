@@ -49,6 +49,11 @@ impl Fake {
         }
     }
 
+    fn sign_out(&self) {
+        *self.token.lock().unwrap() = None;
+        let _ = fs::remove_dir_all(self.epic_data_dir().join("auth"));
+    }
+
     fn session(&self) -> String {
         fs::read_to_string(self.epic_data_dir().join("auth/session.dat")).unwrap_or_default()
     }
@@ -222,25 +227,45 @@ fn status_reports_the_display_name() {
 }
 
 #[test]
-fn status_tracks_launcher_account_after_manual_logout_and_login() {
+fn status_tracks_credential_manager_identity_after_manual_logout_and_login() {
     let (_d, fake, app) = setup();
-    fake.sign_in("alice@x", Some("Alice"), "a1a1", "A");
+    fake.sign_in("epic-user-alice", Some("Alice"), "a1a1", "A");
     ok(save(&app));
 
-    let auth = fake.epic_data_dir().join("auth/auth.json");
-    fs::write(&auth, json!({ "prod": { "account_info": { "email": "bob@x", "display_name": "Bob" } } }).to_string()).unwrap();
-
+    fake.sign_in("epic-user-bob", Some("Bob"), "b2b2", "B");
     let status = ok(app.call("status", &json!({})));
-    assert_eq!(status["username"], json!("bob@x"));
+    assert_eq!(status["username"], json!("epic-user-bob"));
     assert_eq!(status["displayName"], json!("Bob"));
     assert_eq!(status["activeProfile"], Value::Null);
-    assert!(err(save(&app)).contains("older Epic credential"));
 
-    fs::remove_file(auth).unwrap();
+    let saved = ok(save(&app));
+    assert_eq!(names(&saved), vec!["Alice", "Bob"]);
+    assert_eq!(saved["saved"], json!("Bob"));
+
+    fake.sign_out();
     let status = ok(app.call("status", &json!({})));
     assert_eq!(status["username"], Value::Null);
     assert_eq!(status["displayName"], Value::Null);
     assert_eq!(status["activeProfile"], Value::Null);
+}
+
+#[test]
+fn status_and_save_do_not_require_an_email_in_auth_json() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("epic-user-123", Some("Alice"), "a1a1", "A");
+    ok(save(&app));
+
+    let auth = fake.epic_data_dir().join("auth/auth.json");
+    fs::write(&auth, json!({ "prod": { "account_info": { "display_name": "Alice", "country": "PL" } } }).to_string()).unwrap();
+
+    let status = ok(app.call("status", &json!({})));
+    assert_eq!(status["username"], json!("epic-user-123"));
+    assert_eq!(status["displayName"], json!("Alice"));
+    assert_eq!(status["activeProfile"], json!("Alice"));
+
+    let saved = ok(save(&app));
+    assert_eq!(names(&saved), vec!["Alice"]);
+    assert_eq!(saved["saved"], json!("Alice"));
 }
 
 #[test]
