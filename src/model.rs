@@ -34,15 +34,13 @@ pub struct Settings {
     pub launch_after_switch: bool,
     #[serde(default)]
     pub epic_path: String,
-    #[serde(default = "yes")]
-    pub require_password: bool,
     #[serde(default)]
     pub active_profile: Option<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { launch_after_switch: true, epic_path: String::new(), require_password: true, active_profile: None }
+        Settings { launch_after_switch: true, epic_path: String::new(), active_profile: None }
     }
 }
 

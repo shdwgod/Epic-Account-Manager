@@ -10,31 +10,40 @@
 <body>
   <div id="shell" class="shell">
     <main id="main">
-      <section id="session" class="session" aria-live="polite"></section>
+      <div id="viewHome" class="page">
+        <header class="page-head">
+          <h1 id="pageTitle"></h1>
+          <div class="head-actions">
+            <button class="btn ghost" id="btnSettings" type="button"></button>
+            <button class="btn" id="btnSave" type="button"></button>
+          </div>
+        </header>
 
-      <section class="toolbar">
-        <div id="filters" class="filters">
-          <label class="search">
-            <span id="searchIcon"></span>
-            <input id="search" type="search" autocomplete="off" spellcheck="false" />
-          </label>
-          <label class="select">
-            <select id="sort"></select>
-            <span id="sortChevron"></span>
-          </label>
-          <div class="seg-view" role="group">
-            <button type="button" id="viewGrid"></button>
-            <button type="button" id="viewList"></button>
+        <section id="session" class="session" aria-live="polite"></section>
+
+        <div id="listHead" class="list-head">
+          <h2 id="listTitle"></h2>
+          <div id="filters" class="filters">
+            <label class="search" id="searchWrap">
+              <span id="searchIcon"></span>
+              <input id="search" type="search" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="select">
+              <select id="sort"></select>
+              <span id="sortChevron"></span>
+            </label>
+            <div class="seg-view" role="group">
+              <button type="button" id="viewList"></button>
+              <button type="button" id="viewGrid"></button>
+            </div>
           </div>
         </div>
-        <div class="toolbar-actions">
-          <button class="icon-btn" id="btnSettings" type="button"></button>
-          <button class="btn primary" id="btnSave" type="button"></button>
-        </div>
-      </section>
 
-      <section id="grid" class="grid" role="list"></section>
-      <section id="empty" class="empty" hidden></section>
+        <section id="grid" class="accounts" role="list"></section>
+        <section id="empty" class="empty" hidden></section>
+      </div>
+
+      <div id="viewSettings" class="page" hidden></div>
     </main>
   </div>
 

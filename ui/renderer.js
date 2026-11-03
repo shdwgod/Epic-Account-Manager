@@ -22,16 +22,13 @@ const SVG = (inner) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 const ICONS = {
   plus: SVG('<path d="M12 5v14M5 12h14"/>'),
-  gear: SVG('<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>'),
+  gear: SVG('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
+  chevronLeft: SVG('<path d="m15 18-6-6 6-6"/>'),
   dots: SVG('<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>'),
   swap: SVG('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>'),
   pencil: SVG('<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>'),
   trash: SVG('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
-  eye: SVG('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
-  eyeOff: SVG('<path d="M9.9 4.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/>'),
   shield: SVG('<path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>'),
-  lock: SVG('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
-  unlock: SVG('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
   check: SVG('<path d="M20 6 9 17l-5-5"/>'),
   alert: SVG('<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>'),
   search: SVG('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
@@ -53,7 +50,7 @@ function icon(name) {
 
 /* UI-only preferences live in localStorage (the profile data stays in the Rust core). */
 const prefs = (() => {
-  const defaults = { view: 'grid', sort: 'used' };
+  const defaults = { view: 'list', sort: 'used' };
   let data = { ...defaults };
   try { data = { ...defaults, ...JSON.parse(localStorage.getItem('eam.prefs') || '{}') }; } catch { /* ignore */ }
   return {
@@ -68,17 +65,11 @@ let session = null; // { username, activeProfile, epicRunning } from the `status
 let query = '';
 let busy = false;
 let statusSeq = 0;
-let firstRender = true;
+let view = 'home'; // 'home' | 'settings'
 let openDialogCtl = null;
 
 const HUES = [8, 32, 48, 140, 175, 210, 262, 320];
 
-function hueOf(name) {
-  let x = 0;
-  for (const c of name) x = (x * 31 + c.charCodeAt(0)) % 360;
-  return x;
-}
-const profileHue = (p) => (p.hue ?? hueOf(p.name));
 const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/gi, 'l').toLowerCase();
 const stamp = (s) => { const n = s ? new Date(s.replace(' ', 'T')).getTime() : 0; return Number.isNaN(n) ? 0 : n; };
 const shortId = (u) => (u && u.length > 12 ? `${u.slice(0, 4)}…${u.slice(-4)}` : u || '');
@@ -100,7 +91,7 @@ function ago(s) {
 
 function avatarEl(p, cls = '') {
   const el = h('div', { class: `avatar ${cls}` }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : (p.name.trim().charAt(0) || '?'));
-  el.style.setProperty('--h', profileHue(p));
+  if (p.hue != null) { el.classList.add('tinted'); el.style.setProperty('--h', p.hue); } // colour only if the user picked one
   return el;
 }
 
@@ -206,42 +197,6 @@ function textField(label, { value = '', placeholder = '', readonly = false } = {
   const input = h('input', { type: 'text', value, placeholder, autocomplete: 'off', spellcheck: 'false', readonly });
   return { input, el: h('div', { class: 'field' }, h('label', {}, label), h('div', { class: 'input-wrap' }, input)) };
 }
-function passwordField(label, { onInput } = {}) {
-  const input = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false' });
-  const eye = h('button', { type: 'button', class: 'eye', tabindex: '-1', 'aria-label': t('common.showHide') }, icon('eye'));
-  eye.addEventListener('click', () => {
-    const show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    eye.replaceChildren(icon(show ? 'eyeOff' : 'eye'));
-  });
-  if (onInput) input.addEventListener('input', onInput);
-  return { input, el: h('div', { class: 'field' }, h('label', {}, label), h('div', { class: 'input-wrap' }, input, eye)) };
-}
-function strength(pw) {
-  if (!pw) return 0;
-  let s = 0;
-  if (pw.length >= 4) s++;
-  if (pw.length >= 8) s++;
-  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
-  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) s++;
-  return Math.min(4, Math.max(1, s));
-}
-function meter() {
-  const label = h('span', {});
-  const el = h('div', { class: 'meter', 'data-s': '0' }, h('i'), h('i'), h('i'), h('i'), label);
-  return { el, update(pw) { const s = strength(pw); el.dataset.s = s; label.textContent = s ? t(s <= 1 ? 'pw.weak' : s <= 2 ? 'pw.ok' : 'pw.strong') : ''; } };
-}
-function segmented(options, value, onChange) {
-  const wrap = h('div', { class: 'seg', role: 'group' });
-  const btns = options.map((o) => {
-    const b = h('button', { type: 'button', 'aria-pressed': String(o.value === value), disabled: !!o.disabled, title: o.title || '' }, o.label);
-    b.addEventListener('click', () => { value = o.value; btns.forEach((x, i) => x.setAttribute('aria-pressed', String(options[i].value === value))); onChange(value); });
-    return b;
-  });
-  wrap.append(...btns);
-  return wrap;
-}
-
 /* -------------------------------------------------------------------- menu */
 function closeMenu() {
   $('#menuRoot').replaceChildren();
@@ -278,24 +233,24 @@ function profileMenu(p, x, y, tile) {
     { icon: 'pencil', label: t('menu.edit'), run: () => doEdit(p) },
     { icon: 'pin', label: t(p.pinned ? 'menu.unpin' : 'menu.pin'), run: () => doPin(p) },
     { icon: 'refresh', label: t('menu.refresh'), run: () => doRefresh(p) },
-    p.locked
-      ? { icon: 'unlock', label: t('menu.removeLock'), run: () => doRemoveLock(p) }
-      : { icon: 'lock', label: t('menu.addLock'), run: () => doAddLock(p) },
     'sep',
     { icon: 'trash', label: t('common.delete'), danger: true, run: () => doDelete(p) },
   ], x, y, tile);
 }
 
 /* ---------------------------------------------------------------- rendering */
-function setAmbient(hue) { $('#shell').style.setProperty('--ah', hue); }
-function restingHue() { const a = activeProfile(); return a ? profileHue(a) : 222; }
+const SORT_MIN = 3;    // sort + layout switch only appear once there is something to sort
+const SEARCH_MIN = 6;  // search only appears once the list is long enough to need it
 
 function renderStatic() {
-  $('#btnSettings').replaceChildren(icon('gear'));
-  $('#btnSettings').title = t('bar.settings');
-  $('#btnSettings').setAttribute('aria-label', t('bar.settings'));
+  const n = state.profiles.length;
+  $('#pageTitle').textContent = t('page.title');
+  $('#btnSettings').replaceChildren(icon('gear'), t('bar.settings'));
   $('#btnSave').replaceChildren(icon('plus'), t('bar.save'));
+  $('#listTitle').replaceChildren(t('list.title'), h('span', { class: 'count' }, String(n)));
   $('#searchIcon').innerHTML = ICONS.search;
+  $('#search').placeholder = t('toolbar.search');
+  $('#search').setAttribute('aria-label', t('toolbar.search'));
   $('#sortChevron').innerHTML = ICONS.chevron;
   $('#sort').replaceChildren(...['used', 'name', 'saved'].map((k) => h('option', { value: k }, t(`sort.${k}`))));
   $('#sort').value = prefs.sort;
@@ -304,6 +259,8 @@ function renderStatic() {
   $('#viewList').replaceChildren(icon('list'));
   $('#viewGrid').title = t('view.grid');
   $('#viewList').title = t('view.list');
+  $('#viewGrid').setAttribute('aria-label', t('view.grid'));
+  $('#viewList').setAttribute('aria-label', t('view.list'));
   $('#viewGrid').setAttribute('aria-pressed', String(prefs.view === 'grid'));
   $('#viewList').setAttribute('aria-pressed', String(prefs.view === 'list'));
 }
@@ -316,29 +273,30 @@ function renderSession() {
     chips.push(h('span', { class: `chip ${running ? 'on' : ''}` }, h('span', { class: 'dot' }), t(running ? 'session.running' : 'session.closed')));
     if (!launcherFound()) chips.push(h('button', { type: 'button', class: 'chip warn', onclick: openSettings }, t('session.notFound')));
   }
-  const launch = !session || running || !launcherFound() ? null
-    : h('button', { type: 'button', class: 'btn', onclick: doLaunch }, icon('play'), t('session.launch'));
+  const launch = (primary) => (!session || running || !launcherFound() ? null
+    : h('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick: doLaunch }, icon('play'), t('session.launch')));
 
   let face, title, sub, actions;
   const act = activeProfile();
   if (!session) {
-    face = h('div', { class: 'avatar' }, '…'); face.style.setProperty('--h', 222);
+    face = h('div', { class: 'avatar' }, '…');
     title = h('span', { class: 'skeleton pulse' }, t('session.checking'));
   } else if (act) {
     face = avatarEl(act);
+    if (running) face.classList.add('live');
     title = t('session.active', { name: act.name });
     sub = [h('span', {}, t('session.activeSub')), ...chips];
-    actions = [launch, h('button', { type: 'button', class: 'btn ghost', onclick: () => doRefresh(act) }, icon('refresh'), t('session.refresh'))];
+    actions = [h('button', { type: 'button', class: 'btn ghost', onclick: () => doRefresh(act) }, icon('refresh'), t('session.refresh')), launch(true)];
   } else if (session.username) {
-    face = h('div', { class: 'avatar' }, '?'); face.style.setProperty('--h', 40);
+    face = h('div', { class: 'avatar' }, '?');
     title = t('session.unsaved');
-    sub = [h('span', {}, t('session.unsavedSub', { id: shortId(session.username) })), ...chips];
-    actions = [launch, h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('session.saveThis'))];
+    sub = [h('span', {}, t('session.unsavedSub', { id: session.displayName || shortId(session.username) })), ...chips];
+    actions = [launch(false), h('button', { type: 'button', class: 'btn primary', onclick: () => doSave() }, icon('plus'), t('session.saveThis'))];
   } else {
-    face = h('div', { class: 'avatar' }, '–'); face.style.setProperty('--h', 222);
+    face = h('div', { class: 'avatar' }, '–');
     title = t('session.out');
     sub = [h('span', {}, t('session.outSub')), ...chips];
-    actions = [launch];
+    actions = [launch(true)];
   }
   el.replaceChildren(face,
     h('div', { class: 'session-text' }, h('div', { class: 'session-title' }, title), sub ? h('div', { class: 'session-sub' }, ...sub) : null),
@@ -357,49 +315,38 @@ function visibleProfiles() {
     .sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || by[prefs.sort](a, b));
 }
 
-function renderTile(p, index) {
+function renderTile(p) {
   const active = p.name === session?.activeProfile;
-  const tile = h('article', { class: `tile${active ? ' active' : ''}`, role: 'listitem', 'data-name': p.name });
-  tile.style.setProperty('--h', profileHue(p));
-  tile.style.setProperty('--i', index);
+  const tile = h('article', { class: `tile${active ? ' active' : ''}${p.hue != null ? ' tinted' : ''}`, role: 'listitem', 'data-name': p.name });
+  if (p.hue != null) tile.style.setProperty('--h', p.hue);
 
-  const meta = p.lastUsed ? t('tile.used', { when: ago(p.lastUsed) }) : t('tile.neverUsed');
+  const meta = p.legacy
+    ? h('span', { class: 'tile-meta warn', title: t('tile.legacy') }, icon('alert'), t('tile.legacyShort'))
+    : h('span', { class: 'tile-meta', title: p.saved || '' }, p.lastUsed ? t('tile.used', { when: ago(p.lastUsed) }) : t('tile.neverUsed'));
+  const cue = active
+    ? h('span', { class: 'cue live' }, h('span', { class: 'dot' }), t('tile.active'))
+    : h('span', { class: 'cue' }, icon('swap'), t('tile.switchCue'));
+
   const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': t('tile.switch', { name: p.name }), onclick: () => doSwitch(p) },
     h('span', { class: 'tile-art' }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : h('span', { class: 'tile-initial' }, p.name.trim().charAt(0) || '?')),
-    h('span', { class: 'tile-body' }, h('span', { class: 'tile-name', title: p.name }, p.name), h('span', { class: 'tile-meta', title: p.saved || '' }, meta)),
-    h('span', { class: 'tile-hint' }, icon('swap'), t('tile.switchHint')));
-
-  const badges = h('div', { class: 'tile-badges' },
-    active ? h('span', { class: 'badge live' }, h('span', { class: 'dot' }), t('tile.active')) : null,
-    h('span', { class: `badge${p.locked ? '' : ' open'}`, title: t(p.locked ? 'tile.locked' : 'tile.open') }, icon(p.locked ? 'lock' : 'unlock')),
-    p.pinned ? h('span', { class: 'badge', title: t('tile.pinned') }, icon('pin')) : null);
+    h('span', { class: 'tile-body' },
+      h('span', { class: 'tile-name', title: p.name }, h('span', { class: 'tile-name-text' }, p.name), p.pinned ? h('span', { class: 'flag', title: t('tile.pinned') }, icon('pin')) : null),
+      meta),
+    cue);
 
   const more = h('button', { type: 'button', class: 'icon-btn tile-menu', 'aria-label': t('tile.more'), 'aria-haspopup': 'menu' }, icon('dots'));
   more.addEventListener('click', (e) => { e.stopPropagation(); const r = more.getBoundingClientRect(); profileMenu(p, r.right - 210, r.bottom + 4, tile); });
   tile.addEventListener('contextmenu', (e) => { e.preventDefault(); profileMenu(p, e.clientX, e.clientY, tile); });
-  tile.addEventListener('mouseenter', () => setAmbient(profileHue(p)));
-  tile.addEventListener('mouseleave', () => setAmbient(restingHue()));
-  main.addEventListener('focus', () => setAmbient(profileHue(p)));
-  main.addEventListener('blur', () => setAmbient(restingHue()));
 
-  tile.append(main, badges, more);
+  tile.append(main, more);
   return tile;
 }
 
 function renderGrid() {
   const focused = document.activeElement?.closest?.('.tile')?.dataset.name;
   const grid = $('#grid');
-  const list = visibleProfiles();
-  grid.className = `grid${prefs.view === 'list' ? ' list' : ''}${firstRender ? ' intro' : ''}`;
-  const tiles = list.map(renderTile);
-  if (!query.trim()) {
-    const add = h('article', { class: 'tile add', role: 'listitem' },
-      h('button', { type: 'button', class: 'tile-main', onclick: () => doSave() }, h('span', { class: 'plus' }, icon('plus')), h('span', {}, t('tile.add'))));
-    add.style.setProperty('--i', tiles.length);
-    tiles.push(add);
-  }
-  grid.replaceChildren(...tiles);
-  if (firstRender && state.profiles.length) { firstRender = false; setTimeout(() => grid.classList.remove('intro'), 1200); }
+  grid.className = `accounts view-${prefs.view === 'grid' ? 'grid' : 'list'}`;
+  grid.replaceChildren(...visibleProfiles().map(renderTile));
   if (focused) grid.querySelector(`.tile[data-name="${CSS.escape(focused)}"] .tile-main`)?.focus();
 }
 
@@ -407,8 +354,11 @@ function renderEmpty() {
   const total = state.profiles.length;
   const noMatch = total > 0 && visibleProfiles().length === 0;
   const empty = $('#empty');
+  if (total < SEARCH_MIN && query) { query = ''; $('#search').value = ''; } // search is hidden, so a stale filter must not linger
   empty.hidden = !(total === 0 || noMatch);
-  $('#filters').hidden = total === 0;
+  $('#listHead').hidden = total === 0;
+  $('#filters').hidden = total < SORT_MIN;
+  $('#searchWrap').hidden = total < SEARCH_MIN;
   $('#btnSave').hidden = total === 0; // the empty state has its own call to action
   $('#grid').hidden = total === 0 || noMatch;
   if (empty.hidden) return;
@@ -425,11 +375,9 @@ function renderEmpty() {
 
 function renderAll() {
   renderStatic();
-  $('#search').placeholder = t('toolbar.search', { n: state.profiles.length });
   renderSession();
   renderGrid();
   renderEmpty();
-  setAmbient(restingHue());
 }
 
 /* ----------------------------------------------------------------- status */
@@ -443,7 +391,7 @@ async function refreshStatus() {
   session = res.data;
   if (!changed) return;
   renderSession();
-  if (activeChanged) { renderGrid(); setAmbient(restingHue()); }
+  if (activeChanged) renderGrid();
 }
 
 /* ----------------------------------------------------------------- actions */
@@ -452,71 +400,19 @@ async function doLaunch() {
   if (data) setTimeout(refreshStatus, 1500);
 }
 
+/* Saving needs no dialog: the profile is named after the Epic display name, and
+   `existing` refreshes a profile that is already saved. */
 async function doSave(existing = null) {
-  if (busy || openDialogCtl) return;
-  const cur = session?.username || null;
-  const matched = existing || (cur && state.profiles.find((p) => p.username === cur)) || null;
-  const mustHavePw = state.settings.requirePassword !== false;
-  let mode = mustHavePw || matched?.locked ? 'pw' : 'none';
-
-  const name = textField(t('save.name'), { value: matched?.name || '', placeholder: t('save.namePh'), readonly: !!existing });
-  const info = h('div');
-  const m = meter();
-  const pw = passwordField(t('common.password'), { onInput: () => m.update(pw.input.value) });
-  const rep = passwordField(t('common.repeat'));
-  const pwBox = h('div', {}, pw.el, rep.el, m.el);
-  const modeHint = h('p', { class: 'sub-hint' });
-  const seg = segmented([
-    { value: 'pw', label: t('save.usePw') },
-    { value: 'none', label: t('save.noPw'), disabled: mustHavePw, title: mustHavePw ? t('save.pwRequired') : '' },
-  ], mode, (v) => { mode = v; syncMode(); });
-  const protection = h('div', { class: 'field' }, h('div', { class: 'label' }, t('save.protection')), seg, modeHint);
-
-  let dlg = null;
-  function syncMode() {
-    pwBox.hidden = mode !== 'pw';
-    modeHint.textContent = mustHavePw && mode === 'pw' ? t('save.pwRequired') : t(mode === 'pw' ? 'save.pwHint' : 'save.noPwHint');
-  }
-  function syncInfo() {
-    const nm = name.input.value.trim();
-    const ex = state.profiles.find((p) => p.name === nm);
-    const notes = [];
-    if (session && !cur) notes.push(h('div', { class: 'note warn' }, t('save.notSignedIn')));
-    else if (cur) notes.push(h('div', { class: 'note' }, t('save.signedIn', { id: shortId(cur) })));
-    const mismatch = !!(ex && cur && ex.username !== cur);
-    if (mismatch) notes.push(h('div', { class: 'note bad' }, t('save.mismatch', { name: ex.name })));
-    else if (ex) notes.push(h('div', { class: 'note' }, t('save.same', { name: ex.name })));
-    info.replaceChildren(...notes);
-    dlg?.setConfirm(mismatch ? t('save.confirmReplace') : t(ex ? 'save.confirmUpdate' : 'save.confirm'), mismatch);
-  }
-  name.input.addEventListener('input', syncInfo);
-  syncMode();
-
-  const pending = openDialog({
-    title: t(existing ? 'save.update' : 'save.title'),
-    children: [info, name.el, protection, pwBox],
-    confirm: t('save.confirm'),
-    onSubmit: async (ctl) => {
-      const nm = name.input.value.trim();
-      if (!nm) { ctl.error(t('name.enter')); name.input.focus(); return false; }
-      if (mode === 'pw') {
-        if (pw.input.value.length < 4) { ctl.error(t('pw.short')); pw.input.focus(); return false; }
-        if (pw.input.value !== rep.input.value) { ctl.error(t('pw.mismatch')); rep.input.focus(); return false; }
-      }
-      const existed = state.profiles.some((p) => p.name === nm);
-      setBusy(true, t('save.busy'));
-      const res = await rpc(window.api.save(nm, mode === 'pw' ? pw.input.value : ''));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); ctl.focus(); return false; }
-      applyState(res.data);
-      toast(t(existed ? 'save.updated' : 'save.done', { name: nm }));
-      refreshStatus();
-      return true;
-    },
-  });
-  dlg = openDialogCtl;
-  syncInfo();
-  await pending;
+  if (busy || openDialogCtl || !session) return;
+  if (!session.username) { toast(t('save.needSignIn'), 'err'); return; }
+  const target = existing || state.profiles.find((p) => p.username === session.username) || null;
+  setBusy(true, t('save.busy'));
+  const res = await rpc(window.api.save(target?.name));
+  setBusy(false);
+  if (!res.ok) { toast(res.error, 'err'); return; }
+  applyState(res.data);
+  toast(t(target ? 'save.updated' : 'save.done', { name: res.data.saved }));
+  refreshStatus();
 }
 
 function afterSwitch(p, data) {
@@ -530,26 +426,11 @@ function afterSwitch(p, data) {
 
 async function doSwitch(p) {
   if (busy || openDialogCtl) return;
-  const run = async (password, ctl) => {
-    setBusy(true, t('switch.busy', { name: p.name }), t('switch.busySub'), p);
-    const res = await rpc(window.api.switchTo(p.name, password));
-    setBusy(false);
-    if (!res.ok) {
-      if (ctl) { ctl.error(res.error); ctl.focus(); } else toast(res.error, 'err');
-      return false;
-    }
-    afterSwitch(p, res.data);
-    return true;
-  };
-  if (!p.locked) { await run(''); return; }
-  const pw = passwordField(t('common.password'));
-  await openDialog({
-    title: t('switch.title', { name: p.name }), hint: t('switch.hint'), children: [pw.el], confirm: t('switch.confirm'),
-    onSubmit: (ctl) => {
-      if (!pw.input.value) { ctl.error(t('pw.enter')); return false; }
-      return run(pw.input.value, ctl);
-    },
-  });
+  setBusy(true, t('switch.busy', { name: p.name }), t('switch.busySub'), p);
+  const res = await rpc(window.api.switchTo(p.name));
+  setBusy(false);
+  if (!res.ok) { toast(res.error, 'err'); return; }
+  afterSwitch(p, res.data);
 }
 
 async function doRefresh(p) {
@@ -638,45 +519,6 @@ async function doEdit(p) {
   });
 }
 
-async function doRemoveLock(p) {
-  if (busy || openDialogCtl) return;
-  const pw = passwordField(t('lock.current'));
-  await openDialog({
-    title: t('lock.removeTitle', { name: p.name }), hint: t('lock.removeHint'), children: [pw.el], confirm: t('lock.remove'),
-    onSubmit: async (ctl) => {
-      if (!pw.input.value) { ctl.error(t('pw.enter')); return false; }
-      setBusy(true, t('lock.busy'));
-      const res = await rpc(window.api.setLock(p.name, pw.input.value, null));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); ctl.focus(); return false; }
-      applyState(res.data);
-      toast(t('lock.removed', { name: p.name }));
-      return true;
-    },
-  });
-}
-
-async function doAddLock(p) {
-  if (busy || openDialogCtl) return;
-  const m = meter();
-  const pw = passwordField(t('common.password'), { onInput: () => m.update(pw.input.value) });
-  const rep = passwordField(t('common.repeat'));
-  await openDialog({
-    title: t('lock.addTitle', { name: p.name }), children: [pw.el, rep.el, m.el], confirm: t('lock.add'),
-    onSubmit: async (ctl) => {
-      if (pw.input.value.length < 4) { ctl.error(t('pw.short')); return false; }
-      if (pw.input.value !== rep.input.value) { ctl.error(t('pw.mismatch')); return false; }
-      setBusy(true, t('lock.busy'));
-      const res = await rpc(window.api.setLock(p.name, null, pw.input.value));
-      setBusy(false);
-      if (!res.ok) { ctl.error(res.error); return false; }
-      applyState(res.data);
-      toast(t('lock.added', { name: p.name }));
-      return true;
-    },
-  });
-}
-
 async function doDelete(p) {
   if (busy || openDialogCtl) return;
   await openDialog({
@@ -692,49 +534,79 @@ async function doDelete(p) {
   });
 }
 
-async function openSettings() {
+/* ----------------------------------------------------------------- settings
+   A page of its own (not a pop-up), so the Launcher path has room and the rows can be big and clear. */
+function showView(next) {
+  view = next;
+  $('#viewHome').hidden = next !== 'home';
+  $('#viewSettings').hidden = next !== 'settings';
+  $('#main').scrollTop = 0;
+}
+
+function closeSettings() {
+  showView('home');
+  $('#btnSettings').focus();
+}
+
+function openSettings() {
   if (busy) return;
   if (openDialogCtl) openDialogCtl.close(null);
-  const s = state.settings;
-  const pathBox = h('div', { class: 'ro', title: s.resolvedEpicPath || '' }, s.resolvedEpicPath || t('settings.notFound'));
-  const autoBtn = h('button', { type: 'button', class: 'btn small ghost', onclick: async () => {
-    const data = await call(window.api.settings({ epicPath: '' }));
-    if (data) { applyState(data); showPath(); }
-  } }, t('settings.auto'));
-  function showPath() {
-    const st = state.settings;
-    pathBox.textContent = st.resolvedEpicPath || t('settings.notFound');
-    pathBox.title = st.resolvedEpicPath || '';
-    autoBtn.hidden = !st.epicPath;
-  }
-  showPath();
+  renderSettings();
+  showView('settings');
+  $('#viewSettings .back').focus();
+}
 
-  const toggle = (key, title, text) => {
-    const input = h('input', { type: 'checkbox', role: 'switch' });
-    input.checked = key === 'requirePassword' ? state.settings[key] !== false : !!state.settings[key];
-    input.addEventListener('change', async () => {
-      const data = await call(window.api.settings({ [key]: input.checked }));
-      if (data) applyState(data); else input.checked = !input.checked;
-    });
-    return h('div', { class: 'setting' }, h('div', {}, h('b', {}, title), h('p', {}, text)), h('label', { class: 'switch' }, input, h('span', { class: 'slider' })));
-  };
+function renderSettings() {
+  const root = $('#viewSettings');
 
-  const browse = h('button', { type: 'button', class: 'btn small', onclick: async () => {
+  // -- Launcher location: status, the path itself (wraps, never cut off) and two actions
+  const status = h('div', { class: 'launcher-status' });
+  const pathBox = h('div', { class: 'pathbox' });
+  const help = h('p', {});
+  const choose = h('button', { type: 'button', class: 'btn small', onclick: async () => {
     const res = await window.api.browse();
-    if (res.ok && res.data) { applyState(res.data); showPath(); } else if (!res.ok) toast(res.error, 'err');
-  } }, icon('folder'), t('settings.browse'));
+    if (res.ok && res.data) { applyState(res.data); paintPath(); } else if (!res.ok) toast(res.error, 'err');
+  } }, icon('folder'), t('settings.choose'));
+  const auto = h('button', { type: 'button', class: 'btn small ghost', onclick: async () => {
+    const data = await call(window.api.settings({ epicPath: '' }));
+    if (data) { applyState(data); paintPath(); }
+  } }, t('settings.auto'));
+  function paintPath() {
+    const st = state.settings;
+    const kind = st.resolvedEpicPath ? (st.epicPath ? 'custom' : 'auto') : 'missing';
+    status.className = `launcher-status ${kind}`;
+    status.replaceChildren(h('span', { class: 'status-dot' }), t(`settings.status.${kind}`));
+    pathBox.textContent = st.resolvedEpicPath || '';
+    pathBox.hidden = !st.resolvedEpicPath;
+    help.textContent = kind === 'missing' ? t('settings.missingHelp') : '';
+    help.hidden = kind !== 'missing';
+    auto.hidden = !st.epicPath;
+  }
+  paintPath();
 
-  await openDialog({
-    title: t('settings.title'), confirm: t('common.done'), hideCancel: true,
-    children: [
-      toggle('requirePassword', t('settings.requirePw'), t('settings.requirePwText')),
-      toggle('launchAfterSwitch', t('settings.launch'), t('settings.launchText')),
-      h('div', { class: 'block' }, h('div', { class: 'label' }, t('settings.path')), h('div', { class: 'path-row' }, pathBox, browse, autoBtn)),
-      h('div', { class: 'block' }, h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.data'))),
-      h('p', { class: 'about' }, t('settings.about', { v: state.version || '' })),
-      h('p', { class: 'about' }, t('settings.keys')),
-    ],
+  // -- Launch after switching: the whole row is the switch
+  const launchInput = h('input', { type: 'checkbox', role: 'switch' });
+  launchInput.checked = !!state.settings.launchAfterSwitch;
+  launchInput.addEventListener('change', async () => {
+    const data = await call(window.api.settings({ launchAfterSwitch: launchInput.checked }));
+    if (data) applyState(data); else launchInput.checked = !launchInput.checked;
   });
+
+  const section = (title, ...rows) => h('section', {}, h('h2', { class: 'group-title' }, title), h('div', { class: 'group' }, ...rows));
+
+  root.replaceChildren(
+    h('button', { type: 'button', class: 'btn ghost back', onclick: closeSettings }, icon('chevronLeft'), t('settings.back')),
+    h('header', { class: 'settings-head' }, h('h1', {}, t('settings.title'))),
+    section(t('settings.general'),
+      h('label', { class: 'setting' },
+        h('div', { class: 'setting-text' }, h('b', {}, t('settings.launch')), h('p', {}, t('settings.launchText'))),
+        h('span', { class: 'switch' }, launchInput, h('span', { class: 'slider' })))),
+    section(t('settings.launcherSection'),
+      h('div', { class: 'setting stack' }, status, help, pathBox, h('div', { class: 'row-actions' }, choose, auto))),
+    section(t('settings.dataSection'),
+      h('div', { class: 'setting' },
+        h('div', { class: 'setting-text' }, h('b', {}, t('settings.dataTitle')), h('p', {}, t('settings.dataText'))),
+        h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.openData')))));
 }
 
 /* -------------------------------------------------------------- shortcuts */
@@ -756,8 +628,12 @@ function moveFocus(key) {
 
 document.addEventListener('keydown', (e) => {
   if (busy || openDialogCtl || e.defaultPrevented) return;
+  if (view === 'settings') {
+    if (e.key === 'Escape' || (e.ctrlKey && e.key === ',')) { e.preventDefault(); closeSettings(); }
+    return;
+  }
   const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
-  if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && !typing)) { e.preventDefault(); $('#search').focus(); $('#search').select(); }
+  if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && !typing)) { e.preventDefault(); if (!$('#searchWrap').hidden) { $('#search').focus(); $('#search').select(); } }
   else if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); doSave(); }
   else if (e.ctrlKey && e.key === ',') { e.preventDefault(); openSettings(); }
   else if (e.key === 'Escape' && e.target.id === 'search') { query = ''; e.target.value = ''; e.target.blur(); renderAll(); }

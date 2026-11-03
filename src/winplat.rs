@@ -25,6 +25,10 @@ fn home_dir() -> PathBuf {
     env_path("USERPROFILE").unwrap_or_else(|| PathBuf::from("."))
 }
 
+fn local_app_data() -> PathBuf {
+    env_path("LOCALAPPDATA").unwrap_or_else(|| home_dir().join("AppData").join("Local"))
+}
+
 /// Run a console tool without flashing a window and return its stdout.
 fn run(cmd: &str, args: &[&str]) -> String {
     Command::new(cmd)
@@ -101,13 +105,15 @@ impl Platform for WinPlatform {
     }
 
     fn data_dir(&self) -> PathBuf {
-        home_dir().join("EpicAccountManager")
+        local_app_data().join("EpicAccountManager")
+    }
+
+    fn legacy_data_dir(&self) -> Option<PathBuf> {
+        Some(home_dir().join("EpicAccountManager"))
     }
 
     fn epic_data_dir(&self) -> PathBuf {
-        env_path("LOCALAPPDATA")
-            .unwrap_or_else(|| home_dir().join("AppData").join("Local"))
-            .join("com.epicgames.eglv2")
+        local_app_data().join("com.epicgames.eglv2")
     }
 
     fn open_folder(&self, dir: &Path) -> Result<()> {

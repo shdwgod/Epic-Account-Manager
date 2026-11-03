@@ -30,9 +30,8 @@
 - **One-click switching** between any number of saved Epic Games accounts
 - **Live status bar** — see which saved account the Launcher is signed in to, whether it is running, launch it from the app, or save an account it doesn't know yet
 - **Profile picker UI** — big profile tiles (or a compact list), search, sorting, pinning, per-profile colours and pictures; the background glow follows the active / hovered account
-- **Optional password protection** — protect each profile with its own password (with a strength meter), or turn passwords off in Settings and switch with a single click
-- **Smart saving** — re-saving the account you are signed in to updates its existing profile, and you get a clear warning before a profile would be replaced by a different account
-- **Wrong password? Retry in place** — errors appear inside the dialog instead of closing it
+- **No passwords to type** — profiles are protected by Windows DPAPI, so saving and switching are one click
+- **Smart saving** — one click saves the signed-in account and names it after its Epic display name (read from the Launcher's `auth.json`); saving the same account again refreshes its existing profile
 - **Keyboard friendly** — `Ctrl+F` search, `Ctrl+N` save account, `Ctrl+,` settings, arrow keys move between tiles, right-click opens the profile menu
 - **Auto-launch** the Epic Games Launcher after switching (optional); if it cannot be started the switch still counts and you get a warning
 - **Safe by design** — runs fully offline, nothing is sent anywhere
@@ -48,7 +47,7 @@ The Epic Games Launcher remembers who is signed in using:
 
 When you click **Save current account**, the app closes the Launcher, takes a snapshot of both, encrypts it and stores it as a profile. When you click **Switch**, it closes the Launcher, moves the current `auth` folder to a backup, restores the selected profile's snapshot, and (optionally) starts the Launcher again — now signed in to that account.
 
-Profiles are encrypted either with your password (protected profiles) or with Windows DPAPI only (password-free profiles) — see [Security](#-security).
+Profiles are encrypted with Windows DPAPI — see [Security](#-security).
 
 ## 🚀 Getting started
 
@@ -78,46 +77,43 @@ node ui-dev/serve.mjs     # http://localhost:5173
 ## 📖 Usage
 
 1. Sign in to the Epic Games Launcher with the first account (tick **Remember me**).
-2. In the app click **Save current account**, give it a name and — if passwords are enabled — set a password.
+2. In the app click **Save current account**. The profile is named after your Epic display name; no name or password to enter.
 3. Sign out in the Launcher, sign in to your next account and save it the same way.
-4. From now on just click a profile tile. Protected profiles ask for their password, password-free profiles switch immediately.
+4. From now on just click a profile tile.
 
-### Switching without a password
+### Profiles saved by older versions
 
-1. Open **Settings** and turn off **Require a password**.
-2. Save your accounts — you will no longer be asked for a password, and the cards show **No password**.
-3. Already have protected profiles? Open the `⋯` menu on a card → **Remove password** (needs the current password once).
-
-You can mix both modes: turn the setting back on, or use `⋯` → **Set password** on any password-free profile to protect it again.
+Profiles that were saved with a password can no longer be opened (they are marked with a warning icon). Sign in to that account in the Launcher and use **Update saved session** once; the profile is then password-free.
 
 **Tips**
 
-- Right-click a tile (or use its `⋯` menu) → *Edit profile* to rename it and change its picture or colour; there you can also pin it, refresh its saved session, set / remove its password or delete it.
+- Right-click a tile (or use its `⋯` menu) → *Edit profile* to rename it and change its picture or colour; use the menu to pin it, refresh its saved session or delete it.
 - Pinned profiles always stay at the top.
-- Open **Settings** to enable/disable the password requirement and auto-launch, set the Launcher path manually, or open the data folder.
+- Open **Settings** to turn auto-launch on or off, set the Launcher path manually, or open the data folder.
 
 ## 🗂 Where data is stored
 
 | What | Location |
 | --- | --- |
-| Profiles & settings | `%USERPROFILE%\EpicAccountManager\accounts.json` |
-| Session backups (last 3) | `%USERPROFILE%\EpicAccountManager\backup\` |
+| Profiles & settings | `%LOCALAPPDATA%\EpicAccountManager\accounts.json` |
+| Session backups (last 3) | `%LOCALAPPDATA%\EpicAccountManager\backup\` |
+| WebView2 cache | `%LOCALAPPDATA%\EpicAccountManager\WebView2\` |
+
+Older versions used `%USERPROFILE%\EpicAccountManager`; its contents are copied to the new folder automatically the first time the new folder has no `accounts.json` (the old folder is left untouched).
 
 ## 🔒 Security
 
-- **Protected profiles:** encrypted with a key derived from **your password** using `scrypt`, authenticated with HMAC-SHA256, and additionally wrapped with **Windows DPAPI**, so they can only be opened by your Windows user account.
-- **Password-free profiles:** protected by **Windows DPAPI only**. They cannot be read on another PC or by another Windows user, but anyone using your unlocked Windows account can switch to them without a password. Use this mode only on a PC you trust.
+- **Profiles** are protected by **Windows DPAPI**. They cannot be read on another PC or by another Windows user, but anyone using your unlocked Windows account can switch to them. Use the app only on a PC you trust.
 - The app never talks to the network and has no telemetry.
 - The UI runs in a WebView2 window with a strict Content-Security-Policy (no inline scripts or styles, no remote content).
-- Anyone with access to your unlocked Windows session *and* the profile password (or, for password-free profiles, just the session) could use a saved session, so choose strong passwords for accounts you care about.
+- Anyone with access to your unlocked Windows session could use a saved session.
 
 ## 🛠 Troubleshooting
 
 | Problem | Fix |
 | --- | --- |
 | Launcher still opens the old account | Re-save the profile: sign in to that account in the Launcher, then click **Save current account** again. Saved tokens can expire when Epic rotates them. |
-| "Wrong password" | Passwords are case-sensitive and cannot be recovered. Delete the profile and save it again. |
-| "A password is required" when saving | **Require a password** is turned on in Settings. Turn it off to save profiles without a password. |
+| "saved with a password by an older version" | Sign in to that account in the Launcher and click **Update saved session** (or delete the profile and save it again). |
 | "Could not reset: EBWebView" | The folder was in use. Close any leftover Epic processes and try again. |
 | Launcher not found | Open **Settings → Browse** and select `EpicGamesLauncher.exe`. |
 | Windows SmartScreen warns about the `.exe` | The build is not code-signed. Click **More info → Run anyway**. |

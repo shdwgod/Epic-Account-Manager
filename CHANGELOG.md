@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **No more passwords.** Profiles are protected by Windows DPAPI only; the password option, strength meter and the "Require a password" setting are gone. Profiles saved with a password by an older version can no longer be opened: sign in to the account and use *Update saved session* once.
+- **Saving is one click.** The save dialog is gone; a new profile is named after the account's Epic display name, read from the Launcher's `auth.json` (`prod.account_info.display_name`). A duplicate name gets a ` (2)` suffix, and without `auth.json` the account id is used. Re-saving the same account refreshes its existing profile and keeps a name you chose.
+- The status banner shows the display name of an account that is not saved yet.
+- **Data folder moved** to `%LOCALAPPDATA%\EpicAccountManager` (profiles, backups and the WebView2 cache are all there now). Data from the old `%USERPROFILE%\EpicAccountManager` is copied over automatically the first time the new folder has no `accounts.json`.
+
+- **Calmer look.** Neutral graphite theme with a single accent; the coloured gradient tiles and background glow are gone. Accounts are neutral unless you pick a colour in *Edit profile*. The list view is the default (the grid is still one click away).
+
+- **Settings** redesigned as grouped rows (launch behaviour, Launcher location with its status, saved accounts folder); the version/disclaimer and shortcut footers are gone.
+
+- **Easier to use.** Every account row now has a visible **Switch** button (the whole row still works), the signed-in account sits in a card at the top with a green ring while the Launcher is running, and the Settings button has a proper cog icon and label. Sort, layout and search only appear once the list is long enough to need them (3 and 6 accounts). The extra "add" tile is gone; **Save current account** lives in the header.
+- **Settings is now a page** instead of a pop-up: big rows, the whole "Open Launcher after switching" row toggles, and the Launcher path is shown in full with a clear status (found automatically / your own file / not found). `Esc` or **Back** returns to the accounts.
+
+### Removed
+- The `setLock` command and the `password` argument of `save` / `switch`.
+
 ## 2.1.0
 
 ### UI

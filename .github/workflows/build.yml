@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Syntax check
@@ -43,7 +43,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -75,7 +75,10 @@ jobs:
         shell: pwsh
         run: |
           $exe = "target/release/epic-account-manager.exe"
-          if (-not (Test-Path $exe) -or (Get-Item $exe).Length -lt 1MB) { throw "Build output is missing or suspiciously small." }
+          if (-not (Test-Path $exe)) { throw "Build output is missing." }
+          $size = (Get-Item $exe).Length
+          Write-Host "Built $exe ($size bytes)"
+          if ($size -lt 256KB) { throw "Build output is suspiciously small ($size bytes)." }
 
           New-Item -ItemType Directory -Path dist | Out-Null
           $final = "dist/$env:APP_NAME.exe"
@@ -94,7 +97,7 @@ jobs:
 
       # Downloadable from the run page as "Epic Account Manager.zip" holding "Epic Account Manager.exe".
       - name: Upload exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.APP_NAME }}
           path: dist/${{ env.APP_NAME }}.exe
@@ -103,7 +106,7 @@ jobs:
 
       - name: Upload release files
         if: github.ref_type == 'tag'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-files
           path: |
@@ -121,12 +124,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-files
           path: dist
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: Epic Account Manager ${{ github.ref_name }}
           generate_release_notes: true

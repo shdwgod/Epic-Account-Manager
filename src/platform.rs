@@ -17,8 +17,13 @@ pub trait Platform: Protector + Send + Sync {
     /// Auto-detect `EpicGamesLauncher.exe` in the usual install locations.
     fn find_epic_exe(&self) -> Option<PathBuf>;
 
-    /// `%USERPROFILE%\EpicAccountManager`
+    /// `%LOCALAPPDATA%\EpicAccountManager`
     fn data_dir(&self) -> PathBuf;
+    /// Where older versions kept their data (`%USERPROFILE%\EpicAccountManager`); it is
+    /// copied into `data_dir` once, the first time the new location is empty.
+    fn legacy_data_dir(&self) -> Option<PathBuf> {
+        None
+    }
     /// `%LOCALAPPDATA%\com.epicgames.eglv2`
     fn epic_data_dir(&self) -> PathBuf;
     /// Open a folder in the file manager.

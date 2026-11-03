@@ -16,6 +16,8 @@ use std::sync::Arc;
 const MAX_IMAGE_BYTES: u64 = 15 * 1024 * 1024;
 const MAX_AVATAR_LEN: usize = 500_000;
 const AVATAR_PREFIX: &str = "data:image/png;base64,";
+const LEGACY_PASSWORD_PROFILE: &str =
+    "This profile was saved with a password by an older version. Sign in to that account and save it again.";
 
 pub struct App {
     platform: Arc<dyn Platform>,
@@ -53,6 +55,7 @@ fn now_str() -> String {
 impl App {
     pub fn new(platform: Arc<dyn Platform>) -> Self {
         let store = Store::new(platform.data_dir());
+        migrate_legacy_data(&*platform, &store);
         App { platform, store, busy: AtomicBool::new(false) }
     }
 
@@ -79,10 +82,6 @@ impl App {
             "switch" => {
                 let _g = self.lock()?;
                 self.switch(arg)
-            }
-            "setLock" => {
-                let _g = self.lock()?;
-                self.set_lock(arg)
             }
             "rename" => self.rename(arg),
             "remove" => self.remove(arg),
@@ -132,7 +131,8 @@ impl App {
                     "saved": p.saved,
                     "lastUsed": p.last_used,
                     "avatar": p.avatar,
-                    "locked": p.v != 4,
+                    // Saved by an older version with a password; has to be saved again.
+                    "legacy": p.v != 4,
                     "pinned": p.pinned,
                     "hue": p.hue,
                 })
@@ -142,7 +142,6 @@ impl App {
             "version": env!("CARGO_PKG_VERSION"),
             "profiles": profiles,
             "settings": {
-                "requirePassword": db.settings.require_password,
                 "launchAfterSwitch": db.settings.launch_after_switch,
                 "epicPath": db.settings.epic_path,
                 "resolvedEpicPath": self.epic_path(db).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -150,14 +149,34 @@ impl App {
         })
     }
 
-    fn open_profile(&self, prof: &Profile, password: &str) -> Result<Opened> {
+    /// Profiles are protected by Windows DPAPI only. Older password-protected profiles
+    /// (v1-v3) are no longer opened; the user signs in and saves them again.
+    fn open_profile(&self, prof: &Profile) -> Result<Opened> {
+        if prof.v != 4 {
+            return Err(Error::app(LEGACY_PASSWORD_PROFILE));
+        }
         let p: &dyn crypto::Protector = &*self.platform;
-        Ok(match prof.v {
-            4 => serde_json::from_str(&crypto::decrypt_open(p, &prof.token_encrypted)?)?,
-            3 => serde_json::from_str(&crypto::decrypt_token(p, &prof.token_encrypted, password)?)?,
-            2 => Opened { cred: crypto::decrypt_token(p, &prof.token_encrypted, password)?, files: None, legacy: true },
-            _ => Opened { cred: crypto::decrypt_legacy(p, &prof.token_encrypted, password)?, files: None, legacy: true },
-        })
+        Ok(serde_json::from_str(&crypto::decrypt_open(p, &prof.token_encrypted)?)?)
+    }
+
+    /// Name for a profile that is being saved without the user typing one: the profile that
+    /// already holds this account, otherwise the Epic display name (made unique if needed).
+    fn profile_name_for(&self, db: &Db, username: &str, display_name: Option<String>) -> String {
+        let same_account = |name: &&String| db.accounts.get(*name).is_some_and(|p| p.username == username);
+        if let Some(existing) = db.settings.active_profile.as_ref().filter(same_account) {
+            return existing.clone();
+        }
+        if let Some((existing, _)) = db.accounts.iter().find(|(_, p)| p.username == username) {
+            return existing.clone();
+        }
+        let base = display_name.unwrap_or_else(|| username.to_string());
+        let mut name = base.clone();
+        let mut n = 2;
+        while db.accounts.contains_key(&name) {
+            name = format!("{base} ({n})");
+            n += 1;
+        }
+        name
     }
 
     // ---- commands ----------------------------------------------------------
@@ -178,22 +197,24 @@ impl App {
                 }
             }
         }
-        Ok(json!({ "username": username, "activeProfile": active, "epicRunning": self.platform.epic_running() }))
+        let display_name = username.as_ref().and_then(|_| snapshot::read_display_name(&self.platform.epic_data_dir()));
+        Ok(json!({
+            "username": username,
+            "displayName": display_name,
+            "activeProfile": active,
+            "epicRunning": self.platform.epic_running(),
+        }))
     }
 
+    /// Saves the account the Launcher is signed in to. The profile is named after the Epic
+    /// display name (from `auth.json`); passing `name` refreshes that existing profile instead.
     fn save(&self, arg: &Value) -> Result<Value> {
-        let name = arg_str(arg, "name").trim().to_string();
-        if name.is_empty() {
-            return Err(Error::app("Enter a profile name."));
-        }
-        let password = arg_str(arg, "password");
         let mut db = self.store.load()?;
-        let use_password = !password.is_empty();
-        if use_password && password.chars().count() < 4 {
-            return Err(Error::app("Password must be at least 4 characters."));
-        }
-        if !use_password && db.settings.require_password {
-            return Err(Error::app("A password is required (see Settings)."));
+        let requested = arg_opt(arg, "name").map(str::to_string);
+        if let Some(name) = &requested {
+            if !db.accounts.contains_key(name) {
+                return Err(Error::app("Profile does not exist."));
+            }
         }
 
         let was_running = self.platform.epic_running();
@@ -204,17 +225,21 @@ impl App {
             .filter(|t| !t.blob_hex.is_empty())
             .ok_or_else(|| Error::app("No Epic Games token found. Sign in to the Launcher first (with \"Remember me\" enabled)."))?;
 
-        let snapshot = snapshot::capture(&self.platform.epic_data_dir(), &cur.blob_hex)?;
+        let epic_dir = self.platform.epic_data_dir();
+        let snapshot = snapshot::capture(&epic_dir, &cur.blob_hex)?;
         let p: &dyn crypto::Protector = &*self.platform;
-        let token_encrypted =
-            if use_password { crypto::encrypt_token(p, &snapshot, password)? } else { crypto::encrypt_open(p, &snapshot)? };
+        let token_encrypted = crypto::encrypt_open(p, &snapshot)?;
+        let name = match requested {
+            Some(name) => name,
+            None => self.profile_name_for(&db, &cur.username, snapshot::read_display_name(&epic_dir)),
+        };
 
         // Re-saving a profile refreshes its session but keeps everything the user customised.
         let previous = db.accounts.get(&name).cloned();
         db.accounts.insert(
             name.clone(),
             Profile {
-                v: if use_password { 3 } else { 4 },
+                v: 4,
                 username: cur.username,
                 token_encrypted,
                 saved: Some(now_str()),
@@ -224,43 +249,30 @@ impl App {
                 hue: previous.as_ref().and_then(|x| x.hue),
             },
         );
-        db.settings.active_profile = Some(name);
+        db.settings.active_profile = Some(name.clone());
         self.store.save(&db)?;
         if was_running {
             let _ = self.start_epic(&db);
         }
-        Ok(self.public_state(&db))
+        let mut state = self.public_state(&db);
+        state["saved"] = Value::String(name);
+        Ok(state)
     }
 
     fn switch(&self, arg: &Value) -> Result<Value> {
         let name = arg_str(arg, "name").to_string();
-        let password = arg_str(arg, "password");
         let mut db = self.store.load()?;
         let prof = db.accounts.get(&name).cloned().ok_or_else(|| Error::app("Profile does not exist."))?;
 
-        let opened = self.open_profile(&prof, password)?;
-        let token = opened.cred.clone();
-        let snapshot_files = if opened.legacy { None } else { Some(opened.files.clone().unwrap_or_default()) };
-
-        // v1 profiles are upgraded to the scrypt format on first use.
-        let upgraded = if ![2, 3, 4].contains(&prof.v) {
-            Some(crypto::encrypt_token(&*self.platform, &token, password)?)
-        } else {
-            None
-        };
+        let opened = self.open_profile(&prof)?;
+        let files = opened.files.unwrap_or_default();
 
         self.platform.kill_epic();
         let failed = snapshot::clear_session(&self.platform.epic_data_dir(), self.store.dir());
-        self.platform.write_token(&prof.username, &token)?;
-        if let Some(files) = &snapshot_files {
-            snapshot::restore(&self.platform.epic_data_dir(), files)?;
-        }
+        self.platform.write_token(&prof.username, &opened.cred)?;
+        snapshot::restore(&self.platform.epic_data_dir(), &files)?;
 
         if let Some(entry) = db.accounts.get_mut(&name) {
-            if let Some(enc) = upgraded {
-                entry.token_encrypted = enc;
-                entry.v = 2;
-            }
             entry.last_used = Some(now_str());
         }
         db.settings.active_profile = Some(name);
@@ -275,9 +287,6 @@ impl App {
         if !failed.is_empty() {
             notes.push(format!("Could not reset: {} (file in use?).", failed.join(", ")));
         }
-        if snapshot_files.is_none() {
-            notes.push("This profile has no session snapshot - log in to that account, then re-save it.".to_string());
-        }
         if let Some(e) = launch_error {
             notes.push(e.message());
         }
@@ -287,37 +296,6 @@ impl App {
             state["warnings"] = json!(notes);
         }
         Ok(state)
-    }
-
-    fn set_lock(&self, arg: &Value) -> Result<Value> {
-        let name = arg_str(arg, "name");
-        let mut db = self.store.load()?;
-        let prof = db.accounts.get(name).cloned().ok_or_else(|| Error::app("Profile does not exist."))?;
-        let p: &dyn crypto::Protector = &*self.platform;
-
-        let (v, token_encrypted) = if let Some(new_password) = arg_opt(arg, "newPassword") {
-            if new_password.chars().count() < 4 {
-                return Err(Error::app("Password must be at least 4 characters."));
-            }
-            if prof.v != 4 {
-                return Err(Error::app("This profile already has a password."));
-            }
-            let opened: Opened = serde_json::from_str(&crypto::decrypt_open(p, &prof.token_encrypted)?)?;
-            (3, crypto::encrypt_token(p, &serde_json::to_string(&opened)?, new_password)?)
-        } else {
-            if prof.v == 4 {
-                return Err(Error::app("This profile has no password."));
-            }
-            let opened = self.open_profile(&prof, arg_str(arg, "password"))?;
-            (4, crypto::encrypt_open(p, &serde_json::to_string(&opened)?)?)
-        };
-
-        if let Some(entry) = db.accounts.get_mut(name) {
-            entry.v = v;
-            entry.token_encrypted = token_encrypted;
-        }
-        self.store.save(&db)?;
-        Ok(self.public_state(&db))
     }
 
     fn rename(&self, arg: &Value) -> Result<Value> {
@@ -360,9 +338,6 @@ impl App {
         let mut db = self.store.load()?;
         if let Some(b) = patch.get("launchAfterSwitch").and_then(Value::as_bool) {
             db.settings.launch_after_switch = b;
-        }
-        if let Some(b) = patch.get("requirePassword").and_then(Value::as_bool) {
-            db.settings.require_password = b;
         }
         if let Some(s) = patch.get("epicPath").and_then(Value::as_str) {
             db.settings.epic_path = s.to_string();
@@ -436,6 +411,16 @@ impl App {
             Ok(Value::String(format!("data:{mime};base64,{}", STANDARD.encode(std::fs::read(&path)?))))
         })())
     }
+}
+
+/// Older versions kept their data in `%USERPROFILE%\EpicAccountManager`. The first time the
+/// new folder has no `accounts.json`, everything is copied over (the old folder is left alone).
+fn migrate_legacy_data(platform: &dyn Platform, store: &Store) {
+    let Some(old) = platform.legacy_data_dir() else { return };
+    if old == store.dir() || !old.join("accounts.json").is_file() || store.dir().join("accounts.json").exists() {
+        return;
+    }
+    let _ = snapshot::copy_dir(&old, store.dir());
 }
 
 fn valid_avatar(s: &str) -> bool {
