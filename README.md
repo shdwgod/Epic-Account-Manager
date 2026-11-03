@@ -27,7 +27,7 @@
 - **One click** to switch between any number of saved accounts
 - **No passwords to type**: sessions are saved with Windows DPAPI
 - **Profile picker UI** with colours, pictures, pinning and search
-- **Offline and tiny**: one `.exe`, no installer, no Node.js, no Electron
+- **Native Windows installer**: Start Menu and optional desktop shortcuts, clean uninstall, no Node.js or Electron
 - **Safe**: the previous session is backed up before every switch
 
 > Works with the new **Preview Launcher** only.
@@ -39,7 +39,7 @@
 3. Sign out, sign in to the next account and save it too.
 4. From now on, click an account to switch to it.
 
-Download the zip from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases), unzip it and run **Epic Account Manager.exe**. It needs the Microsoft Edge WebView2 runtime, which comes with Windows 11 and most Windows 10 installs.
+Download **Epic Account Manager Setup.exe** from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases) and follow the installer. It installs the app into Program Files, creates a Start Menu shortcut, and can optionally create a desktop shortcut. If the Microsoft Edge WebView2 Runtime is missing, setup installs it from Microsoft's official bootstrapper. A portable ZIP is also available for users who prefer not to install the app.
 
 **Shortcuts:** `Ctrl+F` search · `Ctrl+N` save account · `Ctrl+,` settings · `Esc` leave manage mode · right-click a tile for more
 
@@ -53,7 +53,7 @@ cargo build --release   # target/release/epic-account-manager.exe
 cargo test              # core logic tests
 ```
 
-The UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
+To build the Windows installer locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), place the Microsoft WebView2 Evergreen Bootstrapper at `dist/MicrosoftEdgeWebView2Setup.exe`, and build the app first. Then run `ISCC.exe /DMyAppVersion=2.1.0 installer.iss`. The installer is written to `dist/`.\n\nThe UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
 
 ```bash
 node ui-dev/serve.mjs   # http://localhost:5173  (?empty ?signedout ?unsaved ?many ?nolauncher)
@@ -69,7 +69,7 @@ Data lives in `%LOCALAPPDATA%\EpicAccountManager`: `accounts.json`, the last 3 s
 
 - Profiles are encrypted with **Windows DPAPI**: they can't be read on another PC or by another Windows user.
 - Anyone using your unlocked Windows account can switch to a saved profile, so use the app on a PC you trust.
-- No network access and no telemetry. The UI runs under a strict Content-Security-Policy.
+- The application itself makes no network requests and has no telemetry. The installer contacts Microsoft only if the WebView2 Runtime is missing. The UI runs under a strict Content-Security-Policy.
 
 ## Troubleshooting
 
