@@ -298,9 +298,6 @@ function renderSession() {
   if (!session) { el.replaceChildren(h('span', { class: 'skeleton pulse' }, t('session.checking'))); return; }
   const running = session.epicRunning;
   const act = activeProfile();
-  const canLaunch = launcherFound() && !running;
-  const action = (label, ic, run, primary = false) =>
-    h('button', { type: 'button', class: `btn small ${primary ? 'primary' : 'ghost'}`, onclick: run }, icon(ic), label);
 
   // One capsule, three kinds of segment: Launcher state, who is signed in, what you can do about it.
   const info = [h('span', { class: `seg chip${running ? ' on' : ''}` }, h('span', { class: 'dot' }), t(running ? 'session.running' : 'session.closed'))];
@@ -309,14 +306,11 @@ function renderSession() {
   if (act) {
     info.push(h('span', { class: 'seg' }, t('session.active', { name: act.name })));
     actions.push(action(t('session.refresh'), 'refresh', () => doRefresh(act)));
-    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch, true));
   } else if (session.username) {
     info.push(h('span', { class: 'seg' }, t('session.unsaved', { id: session.displayName || shortId(session.username) })));
-    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch));
     actions.push(action(t('session.saveThis'), 'plus', () => doSave(), true));
   } else {
     info.push(h('span', { class: 'seg' }, t('session.out')));
-    if (canLaunch) actions.push(action(t('session.launch'), 'play', doLaunch, true));
   }
   if (actions.length) info.push(h('span', { class: 'status-actions' }, ...actions));
   el.replaceChildren(...info);
@@ -450,11 +444,6 @@ async function refreshStatus() {
 }
 
 /* ----------------------------------------------------------------- actions */
-async function doLaunch() {
-  const data = await call(window.api.launch());
-  if (data) setTimeout(refreshStatus, 1500);
-}
-
 /* Saving needs no dialog: the profile is named after the Epic display name, and
    `existing` refreshes a profile that is already saved. */
 async function doSave(existing = null) {
@@ -472,8 +461,7 @@ async function doSave(existing = null) {
 
 function afterSwitch(p, data) {
   applyState(data);
-  toast(t('switch.done', { name: p.name }), 'ok',
-    !data.settings.launchAfterSwitch && launcherFound() ? { label: t('switch.launchNow'), run: doLaunch } : null);
+  toast(t('switch.done', { name: p.name }));
   const notes = data.warnings || (data.warning ? [data.warning] : []);
   notes.forEach((n) => toast(n, 'err'));
   refreshStatus();
