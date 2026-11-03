@@ -32,10 +32,21 @@ VersionInfoDescription={#MyAppName} Setup
 VersionInfoCompany=shdwgod
 
 [Languages]
+Name: "polish"; MessagesFile: "compiler:Languages\\Polish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+polish.CreateDesktopIcon=Utwórz skrót na pulpicie
+english.CreateDesktopIcon=Create a desktop shortcut
+polish.AdditionalShortcuts=Dodatkowe skróty:
+english.AdditionalShortcuts=Additional shortcuts:
+polish.LaunchApp=Uruchom Epic Account Manager
+english.LaunchApp=Launch Epic Account Manager
+polish.InstallingWebView2=Instalowanie Microsoft Edge WebView2 Runtime...
+english.InstallingWebView2=Installing Microsoft Edge WebView2 Runtime...
+
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalShortcuts}"; Flags: unchecked
 
 [Files]
 Source: "dist\Epic Account Manager.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -46,8 +57,8 @@ Name: "{group}\Epic Account Manager"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\Epic Account Manager"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{tmp}\MicrosoftEdgeWebView2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime..."; Flags: waituntilterminated; Check: not IsWebView2Installed
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch Epic Account Manager"; Flags: nowait postinstall skipifsilent
+Filename: "{tmp}\MicrosoftEdgeWebView2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "{cm:InstallingWebView2}"; Flags: waituntilterminated; Check: not IsWebView2Installed
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 function HasValidRuntimeVersion(RootKey: Integer; const SubKeyName: String): Boolean;
