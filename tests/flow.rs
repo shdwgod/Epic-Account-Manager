@@ -44,7 +44,7 @@ impl Fake {
         fs::create_dir_all(&auth).unwrap();
         fs::write(auth.join("session.dat"), session_marker).unwrap();
         if let Some(name) = display {
-            let json = json!({ "prod": { "account_info": { "email": "x", "display_name": name, "country": "PL" } } });
+            let json = json!({ "prod": { "account_info": { "email": user, "display_name": name, "country": "PL" } } });
             fs::write(auth.join("auth.json"), json.to_string()).unwrap();
         }
     }
@@ -219,6 +219,28 @@ fn status_reports_the_display_name() {
     let status = ok(app.call("status", &json!({})));
     assert_eq!(status["username"], json!("alice@x"));
     assert_eq!(status["displayName"], json!("shdwlol"));
+}
+
+#[test]
+fn status_tracks_launcher_account_after_manual_logout_and_login() {
+    let (_d, fake, app) = setup();
+    fake.sign_in("alice@x", Some("Alice"), "a1a1", "A");
+    ok(save(&app));
+
+    let auth = fake.epic_data_dir().join("auth/auth.json");
+    fs::write(&auth, json!({ "prod": { "account_info": { "email": "bob@x", "display_name": "Bob" } } }).to_string()).unwrap();
+
+    let status = ok(app.call("status", &json!({})));
+    assert_eq!(status["username"], json!("bob@x"));
+    assert_eq!(status["displayName"], json!("Bob"));
+    assert_eq!(status["activeProfile"], Value::Null);
+    assert!(err(save(&app)).contains("older Epic credential"));
+
+    fs::remove_file(auth).unwrap();
+    let status = ok(app.call("status", &json!({})));
+    assert_eq!(status["username"], Value::Null);
+    assert_eq!(status["displayName"], Value::Null);
+    assert_eq!(status["activeProfile"], Value::Null);
 }
 
 #[test]
