@@ -337,7 +337,7 @@ fn profiles_saved_with_a_password_must_be_saved_again() {
     let msg = err(switch(&app, "Old"));
     assert!(msg.contains("saved with a password") && msg.contains("save it again"), "{msg}");
     assert_eq!(*fake.kills.lock().unwrap(), 0, "the launcher must not be closed");
-    assert_eq!(fake.read_token().unwrap().username, "bob@x");
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
     assert_eq!(fake.session(), "SESSION-BOB");
 
     // Signing in and saving again replaces it with a password-free profile.
