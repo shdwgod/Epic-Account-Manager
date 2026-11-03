@@ -159,17 +159,27 @@ impl App {
         Ok(serde_json::from_str(&crypto::decrypt_open(p, &prof.token_encrypted)?)?)
     }
 
-    /// Name for a profile that is being saved without the user typing one: the profile that
-    /// already holds this account, otherwise the Epic display name (made unique if needed).
-    fn profile_name_for(&self, db: &Db, username: &str, display_name: Option<String>) -> String {
-        let same_account = |name: &&String| db.accounts.get(*name).is_some_and(|p| p.username == username);
-        if let Some(existing) = db.settings.active_profile.as_ref().filter(same_account) {
-            return existing.clone();
+    fn profile_email(&self, profile: &Profile) -> Option<String> {
+        if profile.username.contains('@') {
+            return Some(profile.username.clone());
         }
-        if let Some((existing, _)) = db.accounts.iter().find(|(_, p)| p.username == username) {
-            return existing.clone();
+        let opened = self.open_profile(profile).ok()?;
+        snapshot::read_email_from_snapshot(opened.files.as_ref()?)
+    }
+
+    /// Reuse an existing profile by Epic email, including profiles saved by older versions.
+    fn profile_name_for(&self, db: &Db, email: &str, display_name: Option<String>) -> String {
+        if let Some(active) = db.settings.active_profile.as_ref() {
+            if db.accounts.get(active).and_then(|profile| self.profile_email(profile)).is_some_and(|saved| saved.eq_ignore_ascii_case(email)) {
+                return active.clone();
+            }
         }
-        let base = display_name.unwrap_or_else(|| username.to_string());
+        if let Some((name, _)) = db.accounts.iter().find(|(_, profile)| {
+            self.profile_email(profile).is_some_and(|saved| saved.eq_ignore_ascii_case(email))
+        }) {
+            return name.clone();
+        }
+        let base = display_name.unwrap_or_else(|| email.to_string());
         let mut name = base.clone();
         let mut n = 2;
         while db.accounts.contains_key(&name) {
@@ -184,14 +194,20 @@ impl App {
     fn status(&self) -> Result<Value> {
         let db = self.store.load()?;
         let epic_dir = self.platform.epic_data_dir();
-        let username = self.platform.read_token().map(|token| token.username).filter(|value| !value.trim().is_empty());
+        let username = snapshot::read_email(&epic_dir);
         let mut active: Option<String> = None;
-        if let Some(user) = &username {
-            let marked = db.settings.active_profile.as_ref().filter(|m| db.accounts.get(*m).is_some_and(|p| &p.username == user));
-            if let Some(m) = marked {
-                active = Some(m.clone());
+        if let Some(email) = &username {
+            let marked = db.settings.active_profile.as_ref().filter(|name| {
+                db.accounts.get(*name).and_then(|profile| self.profile_email(profile))
+                    .is_some_and(|saved| saved.eq_ignore_ascii_case(email))
+            });
+            if let Some(name) = marked {
+                active = Some(name.clone());
             } else {
-                let same: Vec<&String> = db.accounts.iter().filter(|(_, p)| &p.username == user).map(|(n, _)| n).collect();
+                let same: Vec<&String> = db.accounts.iter()
+                    .filter(|(_, profile)| self.profile_email(profile).is_some_and(|saved| saved.eq_ignore_ascii_case(email)))
+                    .map(|(name, _)| name)
+                    .collect();
                 if same.len() == 1 {
                     active = Some(same[0].clone());
                 }
@@ -223,19 +239,20 @@ impl App {
         }
 
         let result = (|| {
-            let cur = self
-                .platform
-                .read_token()
+            let cur = self.platform.read_token()
                 .filter(|token| !token.blob_hex.is_empty())
                 .ok_or_else(|| Error::app("No Epic Games token found. Sign in to the Launcher first (with \"Remember me\" enabled)."))?;
 
             let epic_dir = self.platform.epic_data_dir();
+            let email = snapshot::read_email(&epic_dir)
+                .ok_or_else(|| Error::app("Could not identify the Epic account. Sign in again and wait for the Launcher to finish loading, then try again."))?;
+            let display_name = snapshot::read_display_name(&epic_dir);
             let snapshot = snapshot::capture(&epic_dir, &cur.blob_hex)?;
             let p: &dyn crypto::Protector = &*self.platform;
             let token_encrypted = crypto::encrypt_open(p, &snapshot)?;
             let name = match requested.as_ref() {
                 Some(name) => name.clone(),
-                None => self.profile_name_for(&db, &cur.username, snapshot::read_display_name(&epic_dir)),
+                None => self.profile_name_for(&db, &email, display_name),
             };
 
             let previous = db.accounts.get(&name).cloned();
@@ -243,7 +260,8 @@ impl App {
                 name.clone(),
                 Profile {
                     v: 4,
-                    username: cur.username,
+                    username: email,
+                    credential_username: Some(cur.username),
                     token_encrypted,
                     saved: Some(now_str()),
                     last_used: previous.as_ref().and_then(|profile| profile.last_used.clone()),
@@ -276,7 +294,7 @@ impl App {
 
         self.platform.kill_epic();
         let failed = snapshot::clear_session(&self.platform.epic_data_dir(), self.store.dir());
-        self.platform.write_token(&prof.username, &opened.cred)?;
+        self.platform.write_token(prof.credential_username.as_deref().unwrap_or("credentials"), &opened.cred)?;
         snapshot::restore(&self.platform.epic_data_dir(), &files)?;
 
         if let Some(entry) = db.accounts.get_mut(&name) {
