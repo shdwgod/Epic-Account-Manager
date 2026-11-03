@@ -293,6 +293,10 @@ fn legacy_profiles_with_generic_credential_username_keep_their_identity() {
     assert_eq!(status["username"], json!("player@example.com"));
     assert_eq!(status["activeProfile"], json!("Player"));
 
+    ok(switch(&app, "Player"));
+    assert_eq!(fake.read_token().unwrap().username, "credentials");
+    assert_eq!(fake.session(), "SESSION-PLAYER");
+
     let saved = ok(save(&app));
     assert_eq!(names(&saved), vec!["Player"]);
     assert_eq!(profile(&saved, "Player")["username"], json!("player@example.com"));
