@@ -298,6 +298,8 @@ function renderSession() {
   if (!session) { el.replaceChildren(h('span', { class: 'skeleton pulse' }, t('session.checking'))); return; }
   const running = session.epicRunning;
   const act = activeProfile();
+  const action = (label, ic, run, primary = false) =>
+    h('button', { type: 'button', class: `btn small ${primary ? 'primary' : 'ghost'}`, onclick: run }, icon(ic), label);
 
   // One capsule, three kinds of segment: Launcher state, who is signed in, what you can do about it.
   const info = [h('span', { class: `seg chip${running ? ' on' : ''}` }, h('span', { class: 'dot' }), t(running ? 'session.running' : 'session.closed'))];
