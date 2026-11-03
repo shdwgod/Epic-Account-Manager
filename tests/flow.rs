@@ -300,7 +300,8 @@ fn legacy_profiles_with_generic_credential_username_keep_their_identity() {
     let saved = ok(save(&app));
     assert_eq!(names(&saved), vec!["Player"]);
     assert_eq!(profile(&saved, "Player")["username"], json!("player@example.com"));
-    assert_eq!(profile(&saved, "Player")["credential_username"], json!("credentials"));
+    let persisted: Value = serde_json::from_str(&fs::read_to_string(fake.data_dir().join("accounts.json")).unwrap()).unwrap();
+    assert_eq!(persisted["accounts"]["Player"]["credential_username"], json!("credentials"));
 }
 #[test]
 fn save_then_switch_restores_credential_and_session() {
