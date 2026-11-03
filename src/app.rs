@@ -184,7 +184,7 @@ impl App {
     fn status(&self) -> Result<Value> {
         let db = self.store.load()?;
         let epic_dir = self.platform.epic_data_dir();
-        let username = snapshot::read_email(&epic_dir);
+        let username = self.platform.read_token().map(|token| token.username).filter(|value| !value.trim().is_empty());
         let mut active: Option<String> = None;
         if let Some(user) = &username {
             let marked = db.settings.active_profile.as_ref().filter(|m| db.accounts.get(*m).is_some_and(|p| &p.username == user));
@@ -218,53 +218,52 @@ impl App {
         }
 
         let was_running = self.platform.epic_running();
-        self.platform.kill_epic();
-        let cur = self
-            .platform
-            .read_token()
-            .filter(|t| !t.blob_hex.is_empty())
-            .ok_or_else(|| Error::app("No Epic Games token found. Sign in to the Launcher first (with \"Remember me\" enabled)."))?;
-
-        let epic_dir = self.platform.epic_data_dir();
-        if let Some(current_email) = snapshot::read_email(&epic_dir) {
-            if !current_email.eq_ignore_ascii_case(&cur.username) {
-                if was_running {
-                    let _ = self.start_epic(&db);
-                }
-                return Err(Error::app("The Launcher account changed, but Windows still has an older Epic credential. Restart the Launcher and try again."));
-            }
+        if was_running {
+            self.platform.kill_epic();
         }
-        let snapshot = snapshot::capture(&epic_dir, &cur.blob_hex)?;
-        let p: &dyn crypto::Protector = &*self.platform;
-        let token_encrypted = crypto::encrypt_open(p, &snapshot)?;
-        let name = match requested {
-            Some(name) => name,
-            None => self.profile_name_for(&db, &cur.username, snapshot::read_display_name(&epic_dir)),
-        };
 
-        // Re-saving a profile refreshes its session but keeps everything the user customised.
-        let previous = db.accounts.get(&name).cloned();
-        db.accounts.insert(
-            name.clone(),
-            Profile {
-                v: 4,
-                username: cur.username,
-                token_encrypted,
-                saved: Some(now_str()),
-                last_used: previous.as_ref().and_then(|x| x.last_used.clone()),
-                avatar: previous.as_ref().and_then(|x| x.avatar.clone()),
-                pinned: previous.as_ref().is_some_and(|x| x.pinned),
-                hue: previous.as_ref().and_then(|x| x.hue),
-            },
-        );
-        db.settings.active_profile = Some(name.clone());
-        self.store.save(&db)?;
+        let result = (|| {
+            let cur = self
+                .platform
+                .read_token()
+                .filter(|token| !token.blob_hex.is_empty())
+                .ok_or_else(|| Error::app("No Epic Games token found. Sign in to the Launcher first (with \"Remember me\" enabled)."))?;
+
+            let epic_dir = self.platform.epic_data_dir();
+            let snapshot = snapshot::capture(&epic_dir, &cur.blob_hex)?;
+            let p: &dyn crypto::Protector = &*self.platform;
+            let token_encrypted = crypto::encrypt_open(p, &snapshot)?;
+            let name = match requested.as_ref() {
+                Some(name) => name.clone(),
+                None => self.profile_name_for(&db, &cur.username, snapshot::read_display_name(&epic_dir)),
+            };
+
+            let previous = db.accounts.get(&name).cloned();
+            db.accounts.insert(
+                name.clone(),
+                Profile {
+                    v: 4,
+                    username: cur.username,
+                    token_encrypted,
+                    saved: Some(now_str()),
+                    last_used: previous.as_ref().and_then(|profile| profile.last_used.clone()),
+                    avatar: previous.as_ref().and_then(|profile| profile.avatar.clone()),
+                    pinned: previous.as_ref().is_some_and(|profile| profile.pinned),
+                    hue: previous.as_ref().and_then(|profile| profile.hue),
+                },
+            );
+            db.settings.active_profile = Some(name.clone());
+            self.store.save(&db)?;
+            let mut state = self.public_state(&db);
+            state["saved"] = Value::String(name);
+            Ok(state)
+        })();
+
         if was_running {
             let _ = self.start_epic(&db);
         }
-        let mut state = self.public_state(&db);
-        state["saved"] = Value::String(name);
-        Ok(state)
+
+        result
     }
 
     fn switch(&self, arg: &Value) -> Result<Value> {
