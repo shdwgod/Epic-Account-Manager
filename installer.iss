@@ -32,17 +32,12 @@ VersionInfoDescription={#MyAppName} Setup
 VersionInfoCompany=shdwgod
 
 [Languages]
-Name: "polish"; MessagesFile: "compiler:Languages\\Polish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-polish.CreateDesktopIcon=Utwórz skrót na pulpicie
 english.CreateDesktopIcon=Create a desktop shortcut
-polish.AdditionalShortcuts=Dodatkowe skróty:
 english.AdditionalShortcuts=Additional shortcuts:
-polish.LaunchApp=Uruchom Epic Account Manager
 english.LaunchApp=Launch Epic Account Manager
-polish.InstallingWebView2=Instalowanie Microsoft Edge WebView2 Runtime...
 english.InstallingWebView2=Installing Microsoft Edge WebView2 Runtime...
 
 [Tasks]
