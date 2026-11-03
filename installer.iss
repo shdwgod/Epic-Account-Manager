@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.0"
+  #define MyAppVersion "2.2.0"
 #endif
 
 #define MyAppName "Epic Account Manager"
@@ -15,7 +15,7 @@ DefaultDirName={autopf}\Epic Account Manager
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=Epic Account Manager Setup
+OutputBaseFilename=Epic-Account-Manager_Setup
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64
