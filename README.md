@@ -39,7 +39,7 @@
 3. Sign out, sign in to the next account and save it too.
 4. From now on, click an account to switch to it.
 
-Download **Epic Account Manager Setup.exe** from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases) and follow the installer. It installs the app into Program Files, creates a Start Menu shortcut, and can optionally create a desktop shortcut. If the Microsoft Edge WebView2 Runtime is missing, setup installs it from Microsoft's official bootstrapper. A portable ZIP is also available for users who prefer not to install the app.
+Download **Epic-Account-Manager_Setup.exe** from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases) and follow the installer. It installs the app into Program Files, creates a Start Menu shortcut, and can optionally create a desktop shortcut. If the Microsoft Edge WebView2 Runtime is missing, setup installs it from Microsoft's official bootstrapper. **Portable_Epic-Account-Manager.zip** is also available for users who prefer not to install the app.
 
 **Shortcuts:** `Ctrl+F` search · `Ctrl+N` save account · `Ctrl+,` settings · `Esc` leave manage mode · right-click a tile for more
 
@@ -53,7 +53,7 @@ cargo build --release   # target/release/epic-account-manager.exe
 cargo test              # core logic tests
 ```
 
-To build the Windows installer locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), place the Microsoft WebView2 Evergreen Bootstrapper at `dist/MicrosoftEdgeWebView2Setup.exe`, and build the app first. Then run `ISCC.exe /DMyAppVersion=2.1.0 installer.iss`. The installer is written to `dist/`.
+To build the Windows installer locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), place the Microsoft WebView2 Evergreen Bootstrapper at `dist/MicrosoftEdgeWebView2Setup.exe`, and build the app first. Then run `ISCC.exe /DMyAppVersion=2.2.0 installer.iss`. The installer is written to `dist/`.
 
 The UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
 
