@@ -25,7 +25,7 @@ svg { width: 18px; height: 18px; flex: none; }
 /* ---- buttons ---- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: var(--r-sm);
-  font-weight: 600; background: var(--raised); border: 1px solid var(--line); transition: background .12s, border-color .12s;
+  font-weight: 600; white-space: nowrap; flex: none; background: var(--raised); border: 1px solid var(--line); transition: background .12s, border-color .12s;
 }
 .btn:hover:not(:disabled) { background: var(--hover); border-color: var(--line-2); }
 .btn:disabled { opacity: .45; cursor: default; }
@@ -191,8 +191,13 @@ main::-webkit-scrollbar-thumb { background: var(--hover); border-radius: 10px; b
 .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text); }
 .swatch.auto { background: var(--hover); }
 
-.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.group { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); margin-bottom: 16px; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; }
+.setting + .setting { border-top: 1px solid var(--line); }
+.setting-text { min-width: 0; }
+.setting-text b { font-weight: 600; }
 .setting p { color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.4; }
+.setting.stack { flex-direction: column; align-items: stretch; gap: 10px; }
 .switch { position: relative; width: 40px; height: 24px; flex: none; }
 .switch input { opacity: 0; position: absolute; inset: 0; cursor: pointer; z-index: 1; margin: 0; }
 .slider { position: absolute; inset: 0; border-radius: 999px; background: var(--hover); transition: background .18s; }
@@ -200,10 +205,8 @@ main::-webkit-scrollbar-thumb { background: var(--hover); border-radius: 10px; b
 .switch input:checked + .slider { background: var(--accent); }
 .switch input:checked + .slider::after { transform: translateX(16px); background: #0c1426; }
 .switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
-.block { padding: 14px 0 2px; }
 .path-row { display: flex; gap: 8px; align-items: center; }
-.path-row .ro { flex: 1; min-width: 0; }
-.about { color: var(--faint); font-size: 12px; line-height: 1.5; margin-top: 14px; }
+.path-row .ro { flex: 1; min-width: 0; height: 32px; background: var(--surface); }
 
 /* ---- busy + toasts ---- */
 .busy { position: fixed; inset: 0; z-index: 90; display: grid; place-content: center; justify-items: center; gap: 6px; background: rgba(8, 8, 10, .78); animation: fade .15s ease both; }

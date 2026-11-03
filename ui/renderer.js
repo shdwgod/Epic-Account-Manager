@@ -529,43 +529,44 @@ async function doDelete(p) {
 async function openSettings() {
   if (busy) return;
   if (openDialogCtl) openDialogCtl.close(null);
-  const s = state.settings;
-  const pathBox = h('div', { class: 'ro', title: s.resolvedEpicPath || '' }, s.resolvedEpicPath || t('settings.notFound'));
+
+  const pathBox = h('div', { class: 'ro' });
+  const pathNote = h('p', {});
   const autoBtn = h('button', { type: 'button', class: 'btn small ghost', onclick: async () => {
     const data = await call(window.api.settings({ epicPath: '' }));
     if (data) { applyState(data); showPath(); }
   } }, t('settings.auto'));
+  const browse = h('button', { type: 'button', class: 'btn small', onclick: async () => {
+    const res = await window.api.browse();
+    if (res.ok && res.data) { applyState(res.data); showPath(); } else if (!res.ok) toast(res.error, 'err');
+  } }, icon('folder'), t('settings.change'));
   function showPath() {
     const st = state.settings;
     pathBox.textContent = st.resolvedEpicPath || t('settings.notFound');
     pathBox.title = st.resolvedEpicPath || '';
+    pathNote.textContent = t(st.epicPath ? 'settings.pathCustom' : st.resolvedEpicPath ? 'settings.pathAuto' : 'settings.pathMissing');
     autoBtn.hidden = !st.epicPath;
   }
   showPath();
 
-  const toggle = (key, title, text) => {
-    const input = h('input', { type: 'checkbox', role: 'switch' });
-    input.checked = !!state.settings[key];
-    input.addEventListener('change', async () => {
-      const data = await call(window.api.settings({ [key]: input.checked }));
-      if (data) applyState(data); else input.checked = !input.checked;
-    });
-    return h('div', { class: 'setting' }, h('div', {}, h('b', {}, title), h('p', {}, text)), h('label', { class: 'switch' }, input, h('span', { class: 'slider' })));
-  };
+  const row = (title, text, control, cls = '') =>
+    h('div', { class: `setting ${cls}` }, h('div', { class: 'setting-text' }, h('b', {}, title), text), control);
 
-  const browse = h('button', { type: 'button', class: 'btn small', onclick: async () => {
-    const res = await window.api.browse();
-    if (res.ok && res.data) { applyState(res.data); showPath(); } else if (!res.ok) toast(res.error, 'err');
-  } }, icon('folder'), t('settings.browse'));
+  const launchInput = h('input', { type: 'checkbox', role: 'switch', 'aria-label': t('settings.launch') });
+  launchInput.checked = !!state.settings.launchAfterSwitch;
+  launchInput.addEventListener('change', async () => {
+    const data = await call(window.api.settings({ launchAfterSwitch: launchInput.checked }));
+    if (data) applyState(data); else launchInput.checked = !launchInput.checked;
+  });
 
   await openDialog({
     title: t('settings.title'), confirm: t('common.done'), hideCancel: true,
     children: [
-      toggle('launchAfterSwitch', t('settings.launch'), t('settings.launchText')),
-      h('div', { class: 'block' }, h('div', { class: 'label' }, t('settings.path')), h('div', { class: 'path-row' }, pathBox, browse, autoBtn)),
-      h('div', { class: 'block' }, h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.data'))),
-      h('p', { class: 'about' }, t('settings.about', { v: state.version || '' })),
-      h('p', { class: 'about' }, t('settings.keys')),
+      h('div', { class: 'group' },
+        row(t('settings.launch'), h('p', {}, t('settings.launchText')), h('label', { class: 'switch' }, launchInput, h('span', { class: 'slider' }))),
+        row(t('settings.launcher'), pathNote, h('div', { class: 'path-row' }, pathBox, browse, autoBtn), 'stack'),
+        row(t('settings.dataTitle'), h('p', {}, t('settings.dataText')),
+          h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.openData')))),
     ],
   });
 }

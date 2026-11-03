@@ -10,6 +10,8 @@
 
 - **Calmer look.** Neutral graphite theme with a single accent; the coloured gradient tiles and background glow are gone. Accounts are neutral unless you pick a colour in *Edit profile*. The list view is the default (the grid is still one click away).
 
+- **Settings** redesigned as grouped rows (launch behaviour, Launcher location with its status, saved accounts folder); the version/disclaimer and shortcut footers are gone.
+
 ### Removed
 - The `setLock` command and the `password` argument of `save` / `switch`.
 

@@ -50,9 +50,12 @@ const STRINGS = {
 
     'settings.title': 'Settings',
     'settings.launch': 'Launch Epic after switching', 'settings.launchText': 'Start the Launcher with the new account.',
-    'settings.path': 'Launcher', 'settings.notFound': 'Launcher not found', 'settings.browse': 'Browse…', 'settings.auto': 'Detect automatically',
-    'settings.data': 'Open data folder', 'settings.about': 'Version {v}. Unofficial community project, not affiliated with Epic Games, Inc.',
-    'settings.keys': 'Shortcuts: Ctrl+F search, Ctrl+N save account, Ctrl+, settings, arrow keys move between accounts.',
+    'settings.launcher': 'Epic Games Launcher', 'settings.notFound': 'Launcher not found',
+    'settings.pathAuto': 'Found automatically.', 'settings.pathCustom': 'Using a location you chose.',
+    'settings.pathMissing': 'Not found. Choose EpicGamesLauncher.exe.',
+    'settings.change': 'Change…', 'settings.auto': 'Use automatic',
+    'settings.dataTitle': 'Saved accounts', 'settings.dataText': 'Profiles and session backups stay on this PC.',
+    'settings.openData': 'Open folder',
 
     'rel.now': 'just now',
     'edit.imageError': 'Could not read this image.',
