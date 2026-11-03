@@ -228,6 +228,9 @@ impl App {
         let epic_dir = self.platform.epic_data_dir();
         if let Some(current_email) = snapshot::read_email(&epic_dir) {
             if !current_email.eq_ignore_ascii_case(&cur.username) {
+                if was_running {
+                    let _ = self.start_epic(&db);
+                }
                 return Err(Error::app("The Launcher account changed, but Windows still has an older Epic credential. Restart the Launcher and try again."));
             }
         }
