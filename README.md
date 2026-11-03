@@ -41,7 +41,7 @@
 
 Download **Epic-Account-Manager_Setup.exe** from [Releases](https://github.com/shdwgod/Epic-Account-Manager/releases) and follow the installer. It installs the app into Program Files, creates a Start Menu shortcut, and can optionally create a desktop shortcut. If the Microsoft Edge WebView2 Runtime is missing, setup installs it from Microsoft's official bootstrapper. **Portable_Epic-Account-Manager.zip** is also available for users who prefer not to install the app.
 
-**Shortcuts:** `Ctrl+F` search · `Ctrl+N` save account · `Ctrl+,` settings · `Esc` leave manage mode · right-click a tile for more
+**Shortcuts:** `Ctrl+N` save account · `Ctrl+,` settings · `Esc` leave manage mode · right-click a tile for more
 
 ## Build from source
 
