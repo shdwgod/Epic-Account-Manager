@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="Epic-Account-Manager logo" width="300" />
+<img src="docs/logo.png" alt="Epic Account Manager logo" width="300" />
 
-# Epic-Account-Manager
+# Epic Account Manager
 
 **Switch between your Epic Games accounts in one click**  
 **Works only for new Preview Launcher**
@@ -13,13 +13,13 @@
 
 <br />
 
-<a href="https://github.com/shdwgod/Epic-Account-Manager/releases/download/v1.0.0/Epic.Account.Manager.1.0.0.exe">
-  <img src="https://img.shields.io/badge/Download-v1.0.0%20for%20Windows-5b7cff?style=for-the-badge&logo=windows&logoColor=white" alt="Download Epic Account Manager for Windows" height="48" />
+<a href="https://github.com/shdwgod/Epic-Account-Manager/releases/latest">
+  <img src="https://img.shields.io/badge/Download-for%20Windows-5b7cff?style=for-the-badge&logo=windows&logoColor=white" alt="Download Epic Account Manager for Windows" height="48" />
 </a>
 
 <br /><br />
 
-<img src="docs/screenshot.png" alt="Epic-Account-Manager screenshot" width="820" />
+<img src="docs/screenshot.png" alt="Epic Account Manager screenshot" width="820" />
 
 </div>
 
@@ -33,7 +33,6 @@
 - **Optional password protection** — protect each profile with its own password (with a strength meter), or turn passwords off in Settings and switch with a single click
 - **Smart saving** — re-saving the account you are signed in to updates its existing profile, and you get a clear warning before a profile would be replaced by a different account
 - **Wrong password? Retry in place** — errors appear inside the dialog instead of closing it
-- **English and Polish** — follows the system language, switchable in Settings
 - **Keyboard friendly** — `Ctrl+F` search, `Ctrl+N` save account, `Ctrl+,` settings, arrow keys move between tiles, right-click opens the profile menu
 - **Auto-launch** the Epic Games Launcher after switching (optional); if it cannot be started the switch still counts and you get a warning
 - **Safe by design** — runs fully offline, nothing is sent anywhere
@@ -55,7 +54,7 @@ Profiles are encrypted either with your password (protected profiles) or with Wi
 
 ### Download
 
-Grab the portable `.exe` from the [Releases page](https://github.com/shdwgod/Epic-Account-Manager/releases) (or from the CI artifacts of this repository), run it, and you're done. Needs the Microsoft Edge WebView2 runtime, which is built into Windows 11 and most Windows 10 installs.
+Download `Epic-Account-Manager-vX.Y.Z-windows.zip` from the [Releases page](https://github.com/shdwgod/Epic-Account-Manager/releases), unzip it and run **Epic Account Manager.exe**. Nothing to install. Each release also lists SHA-256 checksums in `SHA256SUMS.txt`. Needs the Microsoft Edge WebView2 runtime, which is built into Windows 11 and most Windows 10 installs.
 
 ### Build from source
 
@@ -63,7 +62,7 @@ Requirements: Windows 10 / 11, Epic Games Launcher, [Rust](https://rustup.rs) (s
 
 ```bash
 cargo run --release     # run
-cargo build --release   # -> target/release/*.exe
+cargo build --release   # -> target/release/epic-account-manager.exe
 cargo test              # core logic tests
 ```
 
@@ -73,7 +72,7 @@ The UI is plain HTML/CSS/JS in `ui/` and is embedded into the exe at build time.
 
 ```bash
 node ui-dev/serve.mjs     # http://localhost:5173
-# options: ?empty  ?signedout  ?unsaved  ?lang=pl
+# options: ?empty  ?signedout  ?unsaved
 ```
 
 ## 📖 Usage
@@ -136,7 +135,7 @@ You can mix both modes: turn the setting back on, or use `⋯` → **Set passwor
 ├── ui/
 │   ├── index.html    # App shell
 │   ├── styles.css    # Styling
-│   ├── i18n.js       # English / Polish strings
+│   ├── strings.js    # All user-facing text
 │   └── renderer.js   # UI logic
 ├── ui-dev/           # Browser preview with a fake backend
 ├── tests/            # Integration tests of the core logic
@@ -146,3 +145,4 @@ You can mix both modes: turn the setting back on, or use `⋯` → **Set passwor
 ## ⚠️ Disclaimer
 
 This is an unofficial community project and is **not affiliated with, endorsed by, or sponsored by Epic Games, Inc.** *Epic Games* and the *Epic Games Launcher* are trademarks of Epic Games, Inc.
+

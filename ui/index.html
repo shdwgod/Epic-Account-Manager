@@ -9,29 +9,27 @@
 </head>
 <body>
   <div id="shell" class="shell">
-    <header class="bar">
-      <div class="brand"><span class="mark" id="mark"></span><span id="brandName"></span></div>
-      <div class="bar-actions">
-        <button class="icon-btn" id="btnSettings" type="button"></button>
-        <button class="btn primary" id="btnSave" type="button"></button>
-      </div>
-    </header>
-
     <main id="main">
       <section id="session" class="session" aria-live="polite"></section>
 
-      <section id="toolbar" class="toolbar">
-        <label class="search">
-          <span id="searchIcon"></span>
-          <input id="search" type="search" autocomplete="off" spellcheck="false" />
-        </label>
-        <label class="select">
-          <select id="sort"></select>
-          <span id="sortChevron"></span>
-        </label>
-        <div class="seg-view" role="group">
-          <button type="button" id="viewGrid"></button>
-          <button type="button" id="viewList"></button>
+      <section class="toolbar">
+        <div id="filters" class="filters">
+          <label class="search">
+            <span id="searchIcon"></span>
+            <input id="search" type="search" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="select">
+            <select id="sort"></select>
+            <span id="sortChevron"></span>
+          </label>
+          <div class="seg-view" role="group">
+            <button type="button" id="viewGrid"></button>
+            <button type="button" id="viewList"></button>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <button class="icon-btn" id="btnSettings" type="button"></button>
+          <button class="btn primary" id="btnSave" type="button"></button>
         </div>
       </section>
 
@@ -45,7 +43,7 @@
   <div id="busy" class="busy" hidden><div id="busyArt" class="busy-art"></div><p id="busyText" class="busy-title"></p><p id="busySub" class="busy-sub"></p></div>
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-  <script src="i18n.js"></script>
+  <script src="strings.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

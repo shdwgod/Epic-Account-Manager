@@ -11,6 +11,8 @@ fn main() {
         res.set_icon("icon.ico");
         res.set("ProductName", "Epic Account Manager");
         res.set("FileDescription", "Epic Account Manager");
+        res.set("InternalName", "Epic Account Manager");
+        res.set("OriginalFilename", "Epic Account Manager.exe");
         res.compile().expect("failed to embed Windows resources");
     }
 }

@@ -1,8 +1,7 @@
 /* Fake `window.api` so the UI can be developed in a normal browser (no Rust, no Windows).
-   Options via URL: ?empty  ?signedout  ?unsaved  ?lang=pl */
+   Options via URL: ?empty  ?signedout  ?unsaved */
 (() => {
   const q = new URLSearchParams(location.search);
-  if (q.get('lang')) { try { localStorage.setItem('eam.prefs', JSON.stringify({ lang: q.get('lang'), view: 'grid', sort: 'used' })); } catch {} }
   const ago = (min) => { const d = new Date(Date.now() - min * 60000); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
   let profiles = q.has('empty') ? [] : [
     { name: 'Main account', username: 'a1b2c3d4e5f60718293a4b5c6d7e8f90', saved: ago(60 * 24 * 40), lastUsed: ago(25), avatar: null, locked: true, pinned: true, hue: null },

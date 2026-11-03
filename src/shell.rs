@@ -34,7 +34,7 @@ const ASSETS: &[(&str, &str, &str)] = &[
     ("/", "text/html; charset=utf-8", include_str!("../ui/index.html")),
     ("/index.html", "text/html; charset=utf-8", include_str!("../ui/index.html")),
     ("/styles.css", "text/css; charset=utf-8", include_str!("../ui/styles.css")),
-    ("/i18n.js", "text/javascript; charset=utf-8", include_str!("../ui/i18n.js")),
+    ("/strings.js", "text/javascript; charset=utf-8", include_str!("../ui/strings.js")),
     ("/renderer.js", "text/javascript; charset=utf-8", include_str!("../ui/renderer.js")),
 ];
 

@@ -53,15 +53,14 @@ function icon(name) {
 
 /* UI-only preferences live in localStorage (the profile data stays in the Rust core). */
 const prefs = (() => {
-  const defaults = { lang: 'auto', view: 'grid', sort: 'used' };
+  const defaults = { view: 'grid', sort: 'used' };
   let data = { ...defaults };
   try { data = { ...defaults, ...JSON.parse(localStorage.getItem('eam.prefs') || '{}') }; } catch { /* ignore */ }
   return {
     ...data,
-    save() { try { localStorage.setItem('eam.prefs', JSON.stringify({ lang: this.lang, view: this.view, sort: this.sort })); } catch { /* ignore */ } },
+    save() { try { localStorage.setItem('eam.prefs', JSON.stringify({ view: this.view, sort: this.sort })); } catch { /* ignore */ } },
   };
 })();
-I18N.set(prefs.lang);
 
 /* ------------------------------------------------------------------- state */
 let state = { profiles: [], settings: {}, version: '' };
@@ -92,11 +91,11 @@ function ago(s) {
   const diff = (ms - Date.now()) / 1000;
   const abs = Math.abs(diff);
   if (abs < 60) return t('rel.now');
-  const rtf = new Intl.RelativeTimeFormat(I18N.lang, { numeric: 'auto' });
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
   if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
   if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
   if (abs < 86400 * 30) return rtf.format(Math.round(diff / 86400), 'day');
-  return new Date(ms).toLocaleDateString(I18N.lang, { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(ms).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function avatarEl(p, cls = '') {
@@ -107,8 +106,12 @@ function avatarEl(p, cls = '') {
 
 /* --------------------------------------------------------------------- api */
 async function rpc(promise) {
-  const res = await promise;
-  return res.ok ? { ok: true, data: res.data } : { ok: false, error: I18N.backend(res.error) };
+  try {
+    const res = await promise;
+    return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
 }
 async function call(promise) {
   const r = await rpc(promise);
@@ -205,7 +208,7 @@ function textField(label, { value = '', placeholder = '', readonly = false } = {
 }
 function passwordField(label, { onInput } = {}) {
   const input = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false' });
-  const eye = h('button', { type: 'button', class: 'eye', tabindex: '-1', 'aria-label': 'Show / hide' }, icon('eye'));
+  const eye = h('button', { type: 'button', class: 'eye', tabindex: '-1', 'aria-label': t('common.showHide') }, icon('eye'));
   eye.addEventListener('click', () => {
     const show = input.type === 'password';
     input.type = show ? 'text' : 'password';
@@ -288,8 +291,6 @@ function setAmbient(hue) { $('#shell').style.setProperty('--ah', hue); }
 function restingHue() { const a = activeProfile(); return a ? profileHue(a) : 222; }
 
 function renderStatic() {
-  $('#brandName').textContent = t('app.name');
-  $('#mark').innerHTML = ICONS.shield;
   $('#btnSettings').replaceChildren(icon('gear'));
   $('#btnSettings').title = t('bar.settings');
   $('#btnSettings').setAttribute('aria-label', t('bar.settings'));
@@ -347,7 +348,7 @@ function renderSession() {
 function visibleProfiles() {
   const q = fold(query.trim());
   const by = {
-    name: (a, b) => a.name.localeCompare(b.name, I18N.lang, { sensitivity: 'base' }),
+    name: (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }),
     used: (a, b) => stamp(b.lastUsed) - stamp(a.lastUsed) || by.name(a, b),
     saved: (a, b) => stamp(b.saved) - stamp(a.saved) || by.name(a, b),
   };
@@ -366,7 +367,7 @@ function renderTile(p, index) {
   const main = h('button', { type: 'button', class: 'tile-main', 'aria-label': t('tile.switch', { name: p.name }), onclick: () => doSwitch(p) },
     h('span', { class: 'tile-art' }, p.avatar ? h('img', { src: p.avatar, alt: '' }) : h('span', { class: 'tile-initial' }, p.name.trim().charAt(0) || '?')),
     h('span', { class: 'tile-body' }, h('span', { class: 'tile-name', title: p.name }, p.name), h('span', { class: 'tile-meta', title: p.saved || '' }, meta)),
-    h('span', { class: 'tile-go' }, icon('swap')));
+    h('span', { class: 'tile-hint' }, icon('swap'), t('tile.switchHint')));
 
   const badges = h('div', { class: 'tile-badges' },
     active ? h('span', { class: 'badge live' }, h('span', { class: 'dot' }), t('tile.active')) : null,
@@ -407,7 +408,8 @@ function renderEmpty() {
   const noMatch = total > 0 && visibleProfiles().length === 0;
   const empty = $('#empty');
   empty.hidden = !(total === 0 || noMatch);
-  $('#toolbar').hidden = total === 0;
+  $('#filters').hidden = total === 0;
+  $('#btnSave').hidden = total === 0; // the empty state has its own call to action
   $('#grid').hidden = total === 0 || noMatch;
   if (empty.hidden) return;
   if (total === 0) {
@@ -434,7 +436,7 @@ function renderAll() {
 async function refreshStatus() {
   if (busy || document.hidden) return;
   const seq = ++statusSeq;
-  const res = await window.api.status();
+  const res = await rpc(window.api.status());
   if (!res.ok || seq !== statusSeq || busy) return;
   const changed = JSON.stringify(res.data) !== JSON.stringify(session);
   const activeChanged = res.data.activeProfile !== session?.activeProfile;
@@ -522,7 +524,7 @@ function afterSwitch(p, data) {
   toast(t('switch.done', { name: p.name }), 'ok',
     !data.settings.launchAfterSwitch && launcherFound() ? { label: t('switch.launchNow'), run: doLaunch } : null);
   const notes = data.warnings || (data.warning ? [data.warning] : []);
-  notes.forEach((n) => toast(I18N.backend(n), 'err'));
+  notes.forEach((n) => toast(n, 'err'));
   refreshStatus();
 }
 
@@ -564,9 +566,9 @@ async function doPin(p) {
 
 async function pickCropped() {
   const res = await window.api.pickImage();
-  if (!res.ok) { toast(I18N.backend(res.error), 'err'); return null; }
+  if (!res.ok) { toast(res.error, 'err'); return null; }
   if (!res.data) return null;
-  try { return await cropToAvatar(res.data); } catch { toast('Could not read this image.', 'err'); return null; }
+  try { return await cropToAvatar(res.data); } catch { toast(t('edit.imageError'), 'err'); return null; }
 }
 function cropToAvatar(src) {
   return new Promise((resolve, reject) => {
@@ -719,16 +721,8 @@ async function openSettings() {
 
   const browse = h('button', { type: 'button', class: 'btn small', onclick: async () => {
     const res = await window.api.browse();
-    if (res.ok && res.data) { applyState(res.data); showPath(); } else if (!res.ok) toast(I18N.backend(res.error), 'err');
+    if (res.ok && res.data) { applyState(res.data); showPath(); } else if (!res.ok) toast(res.error, 'err');
   } }, icon('folder'), t('settings.browse'));
-
-  const lang = segmented([
-    { value: 'auto', label: t('settings.langAuto') }, { value: 'en', label: 'English' }, { value: 'pl', label: 'Polski' },
-  ], prefs.lang, (v) => {
-    prefs.lang = v; prefs.save(); I18N.set(v);
-    renderAll();
-    setTimeout(openSettings, 0); // rebuild the dialog in the new language
-  });
 
   await openDialog({
     title: t('settings.title'), confirm: t('common.done'), hideCancel: true,
@@ -736,7 +730,6 @@ async function openSettings() {
       toggle('requirePassword', t('settings.requirePw'), t('settings.requirePwText')),
       toggle('launchAfterSwitch', t('settings.launch'), t('settings.launchText')),
       h('div', { class: 'block' }, h('div', { class: 'label' }, t('settings.path')), h('div', { class: 'path-row' }, pathBox, browse, autoBtn)),
-      h('div', { class: 'block' }, h('div', { class: 'label' }, t('settings.language')), lang),
       h('div', { class: 'block' }, h('button', { type: 'button', class: 'btn small', onclick: () => window.api.openDataFolder() }, icon('folder'), t('settings.data'))),
       h('p', { class: 'about' }, t('settings.about', { v: state.version || '' })),
       h('p', { class: 'about' }, t('settings.keys')),
@@ -772,8 +765,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* -------------------------------------------------------------------- init */
+window.addEventListener('error', (e) => toast(t('app.fatal', { msg: e.message }), 'err'));
+window.addEventListener('unhandledrejection', (e) => { e.preventDefault(); toast(t('app.fatal', { msg: String(e.reason?.message || e.reason) }), 'err'); });
+document.addEventListener('contextmenu', (e) => { if (!e.target.closest('.tile')) e.preventDefault(); });
+
 async function init() {
   renderStatic();
+  if (!window.api) { $('#main').replaceChildren(h('p', { class: 'hint' }, t('app.apiMissing'))); return; }
   $('#btnSave').addEventListener('click', () => doSave());
   $('#btnSettings').addEventListener('click', openSettings);
   $('#search').addEventListener('input', (e) => { query = e.target.value; renderGrid(); renderEmpty(); });
