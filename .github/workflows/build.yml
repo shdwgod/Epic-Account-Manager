@@ -7,7 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A newer push cancels the older run of the same branch; tag builds are never cancelled.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -20,7 +19,6 @@ env:
   APP_NAME: Epic Account Manager
 
 jobs:
-  # Fast feedback (about a minute): the UI is plain JavaScript, so catch syntax errors early.
   ui:
     name: UI checks
     runs-on: ubuntu-latest
@@ -49,6 +47,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
       - name: Read version from Cargo.toml
         shell: pwsh
         run: |
@@ -71,7 +72,7 @@ jobs:
       - name: Build
         run: cargo build --release --locked
 
-      - name: Package
+      - name: Package application and installer
         shell: pwsh
         run: |
           $exe = "target/release/epic-account-manager.exe"
@@ -84,23 +85,43 @@ jobs:
           $final = "dist/$env:APP_NAME.exe"
           Copy-Item $exe $final
 
-          # GitHub turns spaces in release asset names into dots, so the release ships a zip
-          # with a clean name; the exe inside keeps its proper name.
-          $zip = "dist/Epic-Account-Manager-v$env:VERSION-windows.zip"
+          $webView2 = "dist/MicrosoftEdgeWebView2Setup.exe"
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $webView2
+          $signature = Get-AuthenticodeSignature $webView2
+          if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft") {
+            throw "The downloaded WebView2 bootstrapper does not have a valid Microsoft signature."
+          }
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler was not found." }
+          & $iscc "/DMyAppVersion=$env:VERSION" "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE." }
+
+          $zip = "dist/Epic-Account-Manager-v$env:VERSION-windows-portable.zip"
           Compress-Archive -Path $final -DestinationPath $zip
 
-          $lines = foreach ($f in @($final, $zip)) {
-            "$((Get-FileHash $f -Algorithm SHA256).Hash.ToLower())  $(Split-Path $f -Leaf)"
+          $installer = "dist/Epic Account Manager Setup.exe"
+          if (-not (Test-Path $installer)) { throw "Installer output is missing." }
+
+          $lines = foreach ($file in @($final, $zip, $installer)) {
+            "$((Get-FileHash $file -Algorithm SHA256).Hash.ToLower())  $(Split-Path $file -Leaf)"
           }
           $lines | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
           Get-Content dist/SHA256SUMS.txt
 
-      # Downloadable from the run page as "Epic Account Manager.zip" holding "Epic Account Manager.exe".
-      - name: Upload exe
+      - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.APP_NAME }}
-          path: dist/${{ env.APP_NAME }}.exe
+          name: Epic Account Manager Setup
+          path: dist/Epic Account Manager Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v7
+        with:
+          name: Epic Account Manager Portable
+          path: dist/Epic-Account-Manager-v*-windows-portable.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -110,7 +131,8 @@ jobs:
         with:
           name: release-files
           path: |
-            dist/*.zip
+            dist/Epic Account Manager Setup.exe
+            dist/Epic-Account-Manager-v*-windows-portable.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 1
@@ -135,5 +157,6 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/*.zip
+            dist/Epic Account Manager Setup.exe
+            dist/Epic-Account-Manager-v*-windows-portable.zip
             dist/SHA256SUMS.txt
