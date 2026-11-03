@@ -97,10 +97,10 @@ jobs:
           & $iscc "/DMyAppVersion=$env:VERSION" "installer.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE." }
 
-          $zip = "dist/Epic-Account-Manager-v$env:VERSION-windows-portable.zip"
+          $zip = "dist/Portable_Epic-Account-Manager.zip"
           Compress-Archive -Path $final -DestinationPath $zip
 
-          $installer = "dist/Epic Account Manager Setup.exe"
+          $installer = "dist/Epic-Account-Manager_Setup.exe"
           if (-not (Test-Path $installer)) { throw "Installer output is missing." }
 
           $lines = foreach ($file in @($final, $zip, $installer)) {
@@ -112,16 +112,16 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
-          name: Epic Account Manager Setup
-          path: dist/Epic Account Manager Setup.exe
+          name: Epic-Account-Manager_Setup
+          path: dist/Epic-Account-Manager_Setup.exe
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload portable build
         uses: actions/upload-artifact@v7
         with:
-          name: Epic Account Manager Portable
-          path: dist/Epic-Account-Manager-v*-windows-portable.zip
+          name: Portable_Epic-Account-Manager
+          path: dist/Portable_Epic-Account-Manager.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -131,8 +131,8 @@ jobs:
         with:
           name: release-files
           path: |
-            dist/Epic Account Manager Setup.exe
-            dist/Epic-Account-Manager-v*-windows-portable.zip
+            dist/Epic-Account-Manager_Setup.exe
+            dist/Portable_Epic-Account-Manager.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 1
@@ -157,6 +157,6 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/Epic Account Manager Setup.exe
-            dist/Epic-Account-Manager-v*-windows-portable.zip
+            dist/Epic-Account-Manager_Setup.exe
+            dist/Portable_Epic-Account-Manager.zip
             dist/SHA256SUMS.txt
