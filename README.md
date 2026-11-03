@@ -53,7 +53,9 @@ cargo build --release   # target/release/epic-account-manager.exe
 cargo test              # core logic tests
 ```
 
-To build the Windows installer locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), place the Microsoft WebView2 Evergreen Bootstrapper at `dist/MicrosoftEdgeWebView2Setup.exe`, and build the app first. Then run `ISCC.exe /DMyAppVersion=2.1.0 installer.iss`. The installer is written to `dist/`.\n\nThe UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
+To build the Windows installer locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php), place the Microsoft WebView2 Evergreen Bootstrapper at `dist/MicrosoftEdgeWebView2Setup.exe`, and build the app first. Then run `ISCC.exe /DMyAppVersion=2.1.0 installer.iss`. The installer is written to `dist/`.
+
+The UI is plain HTML, CSS and JS in `ui/`. To work on it in a browser with a fake backend:
 
 ```bash
 node ui-dev/serve.mjs   # http://localhost:5173  (?empty ?signedout ?unsaved ?many ?nolauncher)
