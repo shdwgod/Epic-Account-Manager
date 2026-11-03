@@ -183,8 +183,8 @@ impl App {
 
     fn status(&self) -> Result<Value> {
         let db = self.store.load()?;
-        let cur = self.platform.read_token();
-        let username = cur.map(|c| c.username);
+        let epic_dir = self.platform.epic_data_dir();
+        let username = snapshot::read_email(&epic_dir);
         let mut active: Option<String> = None;
         if let Some(user) = &username {
             let marked = db.settings.active_profile.as_ref().filter(|m| db.accounts.get(*m).is_some_and(|p| &p.username == user));
@@ -197,7 +197,7 @@ impl App {
                 }
             }
         }
-        let display_name = username.as_ref().and_then(|_| snapshot::read_display_name(&self.platform.epic_data_dir()));
+        let display_name = username.as_ref().and_then(|_| snapshot::read_display_name(&epic_dir));
         Ok(json!({
             "username": username,
             "displayName": display_name,
@@ -226,6 +226,11 @@ impl App {
             .ok_or_else(|| Error::app("No Epic Games token found. Sign in to the Launcher first (with \"Remember me\" enabled)."))?;
 
         let epic_dir = self.platform.epic_data_dir();
+        if let Some(current_email) = snapshot::read_email(&epic_dir) {
+            if !current_email.eq_ignore_ascii_case(&cur.username) {
+                return Err(Error::app("The Launcher account changed, but Windows still has an older Epic credential. Restart the Launcher and try again."));
+            }
+        }
         let snapshot = snapshot::capture(&epic_dir, &cur.blob_hex)?;
         let p: &dyn crypto::Protector = &*self.platform;
         let token_encrypted = crypto::encrypt_open(p, &snapshot)?;
