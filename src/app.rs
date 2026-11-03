@@ -247,10 +247,14 @@ impl App {
             let email = snapshot::read_email(&epic_dir)
                 .ok_or_else(|| Error::app("Could not identify the Epic account. Sign in again and wait for the Launcher to finish loading, then try again."))?;
             if let Some(name) = requested.as_ref() {
-                if db.accounts.get(name).and_then(|profile| self.profile_email(profile))
-                    .is_some_and(|saved| !saved.eq_ignore_ascii_case(&email))
-                {
-                    return Err(Error::app("The Launcher is signed in to a different Epic account. Switch to the matching account before updating this profile."));
+                match db.accounts.get(name).and_then(|profile| self.profile_email(profile)) {
+                    Some(saved) if saved.eq_ignore_ascii_case(&email) => {}
+                    Some(_) => {
+                        return Err(Error::app("The Launcher is signed in to a different Epic account. Switch to the matching account before updating this profile."));
+                    }
+                    None => {
+                        return Err(Error::app("Could not verify which Epic account this profile belongs to. The profile was not changed."));
+                    }
                 }
             }
             let display_name = snapshot::read_display_name(&epic_dir);
