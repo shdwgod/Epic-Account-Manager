@@ -14,7 +14,7 @@ const STRINGS = {
     'session.out': 'The Launcher isn’t signed in',
     'session.running': 'Launcher running', 'session.closed': 'Launcher closed',
     'session.notFound': 'Launcher not found',
-    'session.launch': 'Launch Epic', 'session.saveThis': 'Save this account', 'session.refresh': 'Update saved session',
+    'session.saveThis': 'Save this account', 'session.refresh': 'Update saved session',
 
     'tile.switch': 'Switch to {name}', 'tile.more': 'More options', 'tile.edit': 'Edit {name}',
     'tile.used': 'Used {when}', 'tile.neverUsed': 'Not used yet',
@@ -41,7 +41,7 @@ const STRINGS = {
     'save.wrongAccount': 'The Launcher is signed in to another account. Sign in to “{name}” first.',
     'save.needSignIn': 'The Launcher isn’t signed in. Sign in first.',
     'name.enter': 'Enter a name.', 'name.taken': 'A profile with this name already exists.', 'switch.busy': 'Switching to {name}…', 'switch.busySub': 'Closing the Launcher and restoring the session.',
-    'switch.done': 'Switched to “{name}”', 'switch.launchNow': 'Launch Epic',
+    'switch.done': 'Switched to “{name}”',
 
     'edit.title': 'Edit profile', 'edit.picture': 'Picture', 'edit.choose': 'Choose picture…', 'edit.remove': 'Remove picture',
     'edit.color': 'Colour', 'edit.auto': 'Auto', 'edit.confirm': 'Save changes', 'edit.done': 'Profile updated',
