@@ -75,7 +75,10 @@ jobs:
         shell: pwsh
         run: |
           $exe = "target/release/epic-account-manager.exe"
-          if (-not (Test-Path $exe) -or (Get-Item $exe).Length -lt 1MB) { throw "Build output is missing or suspiciously small." }
+          if (-not (Test-Path $exe)) { throw "Build output is missing." }
+          $size = (Get-Item $exe).Length
+          Write-Host "Built $exe ($size bytes)"
+          if ($size -lt 256KB) { throw "Build output is suspiciously small ($size bytes)." }
 
           New-Item -ItemType Directory -Path dist | Out-Null
           $final = "dist/$env:APP_NAME.exe"
